@@ -1,5 +1,6 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -7,7 +8,7 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional
+from typing import List, Optional, Any
 import random
 import string
 from datetime import datetime, timezone, timedelta
@@ -39,6 +40,23 @@ api_router = APIRouter(prefix="/api")
 # Security
 security = HTTPBearer()
 
+# Standard Response Helper
+def api_response(code: int, status: str, data: Any):
+    return JSONResponse(
+        status_code=code,
+        content={
+            "code": code,
+            "status": status,
+            "data": data
+        }
+    )
+
+def success_response(data: Any, code: int = 200):
+    return api_response(code, "success", data)
+
+def error_response(message: str, code: int = 400):
+    return api_response(code, "failure", {"message": message})
+
 # Helper functions
 def generate_password(length=6):
     """Generate a 6 digit alphanumeric password"""
@@ -51,7 +69,6 @@ def generate_secret_code(length=5):
 
 async def get_next_user_id():
     """Get next auto-increment 4 digit user ID"""
-    # Find the highest user ID
     last_user = await db.users.find_one(
         {},
         sort=[("user_id", -1)],
@@ -61,7 +78,7 @@ async def get_next_user_id():
     if last_user and "user_id" in last_user:
         next_id = last_user["user_id"] + 1
     else:
-        next_id = 1001  # Start from 1001 for 4 digit IDs
+        next_id = 1001
     
     return next_id
 
@@ -69,11 +86,6 @@ async def get_next_user_id():
 class LoginRequest(BaseModel):
     email: str
     password: str
-
-class LoginResponse(BaseModel):
-    token: str
-    email: str
-    message: str
 
 class UserSignupRequest(BaseModel):
     name: str
@@ -90,30 +102,6 @@ class User(BaseModel):
     secret_code: str
     status: str = "Inactive"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-class UserResponse(BaseModel):
-    user_id: int
-    name: str
-    phone: str
-    device_number: str
-    last_run_location: str
-    password: str
-    secret_code: str
-    status: str
-    created_at: str
-
-class UsersListResponse(BaseModel):
-    users: List[UserResponse]
-    total: int
-
-class UserSignupResponse(BaseModel):
-    user_id: int
-    name: str
-    phone: str
-    password: str
-    secret_code: str
-    status: str
-    message: str
 
 # Helper functions for JWT
 def create_jwt_token(email: str) -> str:
@@ -135,28 +123,31 @@ def verify_jwt_token(credentials: HTTPAuthorizationCredentials = Depends(securit
         raise HTTPException(status_code=401, detail="Invalid token")
 
 # Auth Routes
-@api_router.post("/auth/login", response_model=LoginResponse)
+@api_router.post("/auth/login")
 async def login(request: LoginRequest):
     if request.email == ADMIN_EMAIL and request.password == ADMIN_PASSWORD:
         token = create_jwt_token(request.email)
-        return LoginResponse(
-            token=token,
-            email=request.email,
-            message="Login successful"
-        )
-    raise HTTPException(status_code=401, detail="Invalid credentials")
+        return success_response({
+            "token": token,
+            "email": request.email,
+            "message": "Login successful"
+        })
+    return error_response("Invalid credentials", 401)
 
 @api_router.get("/auth/verify")
 async def verify_token(email: str = Depends(verify_jwt_token)):
-    return {"valid": True, "email": email}
+    return success_response({
+        "valid": True,
+        "email": email
+    })
 
 # User Signup Route (Public - No Auth Required)
-@api_router.post("/users/signup", response_model=UserSignupResponse)
+@api_router.post("/users/signup")
 async def signup_user(request: UserSignupRequest):
     # Check if phone already exists
     existing = await db.users.find_one({"phone": request.phone}, {"_id": 0})
     if existing:
-        raise HTTPException(status_code=400, detail="User with this phone number already exists")
+        return error_response("User with this phone number already exists", 400)
     
     # Generate user data
     user_id = await get_next_user_id()
@@ -179,49 +170,55 @@ async def signup_user(request: UserSignupRequest):
     
     await db.users.insert_one(doc)
     
-    return UserSignupResponse(
-        user_id=user.user_id,
-        name=user.name,
-        phone=user.phone,
-        password=user.password,
-        secret_code=user.secret_code,
-        status=user.status,
-        message="User registered successfully"
-    )
+    return success_response({
+        "user_id": user.user_id,
+        "name": user.name,
+        "phone": user.phone,
+        "password": user.password,
+        "secret_code": user.secret_code,
+        "status": user.status,
+        "message": "User registered successfully"
+    }, 201)
 
 # User Routes (Protected)
-@api_router.get("/users", response_model=UsersListResponse)
+@api_router.get("/users")
 async def get_users(email: str = Depends(verify_jwt_token)):
     users_cursor = db.users.find({}, {"_id": 0}).sort("user_id", 1)
     users = await users_cursor.to_list(1000)
     
     user_responses = []
     for user in users:
-        user_responses.append(UserResponse(
-            user_id=user["user_id"],
-            name=user["name"],
-            phone=user["phone"],
-            device_number=user.get("device_number", ""),
-            last_run_location=user.get("last_run_location", ""),
-            password=user["password"],
-            secret_code=user["secret_code"],
-            status=user.get("status", "Inactive"),
-            created_at=user["created_at"] if isinstance(user["created_at"], str) else user["created_at"].isoformat()
-        ))
+        user_responses.append({
+            "user_id": user["user_id"],
+            "name": user["name"],
+            "phone": user["phone"],
+            "device_number": user.get("device_number", ""),
+            "last_run_location": user.get("last_run_location", ""),
+            "password": user["password"],
+            "secret_code": user["secret_code"],
+            "status": user.get("status", "Inactive"),
+            "created_at": user["created_at"] if isinstance(user["created_at"], str) else user["created_at"].isoformat()
+        })
     
-    return UsersListResponse(users=user_responses, total=len(user_responses))
+    return success_response({
+        "users": user_responses,
+        "total": len(user_responses)
+    })
 
 @api_router.delete("/users/{user_id}")
 async def delete_user(user_id: int, email: str = Depends(verify_jwt_token)):
     result = await db.users.delete_one({"user_id": user_id})
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="User not found")
-    return {"message": "User deleted successfully", "user_id": user_id}
+        return error_response("User not found", 404)
+    return success_response({
+        "message": "User deleted successfully",
+        "user_id": user_id
+    })
 
 @api_router.patch("/users/{user_id}/status")
 async def update_user_status(user_id: int, status: str, email: str = Depends(verify_jwt_token)):
     if status not in ["Active", "Inactive"]:
-        raise HTTPException(status_code=400, detail="Status must be 'Active' or 'Inactive'")
+        return error_response("Status must be 'Active' or 'Inactive'", 400)
     
     result = await db.users.update_one(
         {"user_id": user_id},
@@ -229,19 +226,22 @@ async def update_user_status(user_id: int, status: str, email: str = Depends(ver
     )
     
     if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="User not found")
+        return error_response("User not found", 404)
     
-    return {"message": f"User status updated to {status}", "user_id": user_id}
+    return success_response({
+        "message": f"User status updated to {status}",
+        "user_id": user_id
+    })
 
 @api_router.get("/users/count")
 async def get_users_count(email: str = Depends(verify_jwt_token)):
     count = await db.users.count_documents({})
-    return {"count": count}
+    return success_response({"count": count})
 
 # Health check
 @api_router.get("/")
 async def root():
-    return {"message": "MathayBari Admin API"}
+    return success_response({"message": "MathayBari Admin API"})
 
 # Include the router in the main app
 app.include_router(api_router)
