@@ -9,8 +9,8 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     // Check for existing auth on mount
-    const storedToken = localStorage.getItem('dicer_token');
-    const storedEmail = localStorage.getItem('dicer_email');
+    const storedToken = localStorage.getItem('mathaybari_token');
+    const storedEmail = localStorage.getItem('mathaybari_email');
     
     if (storedToken && storedEmail) {
       setToken(storedToken);
@@ -20,15 +20,15 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = (authToken, email) => {
-    localStorage.setItem('dicer_token', authToken);
-    localStorage.setItem('dicer_email', email);
+    localStorage.setItem('mathaybari_token', authToken);
+    localStorage.setItem('mathaybari_email', email);
     setToken(authToken);
     setUser({ email });
   };
 
   const logout = () => {
-    localStorage.removeItem('dicer_token');
-    localStorage.removeItem('dicer_email');
+    localStorage.removeItem('mathaybari_token');
+    localStorage.removeItem('mathaybari_email');
     setToken(null);
     setUser(null);
   };
