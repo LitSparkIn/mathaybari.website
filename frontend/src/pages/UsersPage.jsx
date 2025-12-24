@@ -2,34 +2,32 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
+import { toast } from 'sonner';
 import {
+  Box,
+  Paper,
+  Typography,
+  Button,
+  TextField,
   Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
   DialogTitle,
-  DialogFooter,
-} from '../components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../components/ui/select';
-import {
+  DialogContent,
+  DialogActions,
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
-  TableHeader,
   TableRow,
-} from '../components/ui/table';
-import { toast } from 'sonner';
-import { Plus, Trash2, Users, Loader2 } from 'lucide-react';
+  IconButton,
+  CircularProgress,
+  Chip,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
+} from '@mui/material';
+import { Add, Delete, People } from '@mui/icons-material';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -52,7 +50,6 @@ export const UsersPage = () => {
 
   useEffect(() => {
     fetchUsers();
-    // Check if we should open create dialog from URL param
     if (searchParams.get('action') === 'create') {
       setDialogOpen(true);
       setSearchParams({});
@@ -130,212 +127,281 @@ export const UsersPage = () => {
   };
 
   return (
-    <div className="p-6 md:p-8 lg:p-12" data-testid="users-page">
+    <Box sx={{ p: { xs: 3, md: 4, lg: 6 } }} data-testid="users-page">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          alignItems: { sm: 'center' },
+          justifyContent: 'space-between',
+          gap: 2,
+          mb: 4,
+        }}
+      >
+        <Box>
+          <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 2 }}>
             Management
-          </p>
-          <h1 className="font-heading text-4xl md:text-5xl font-bold tracking-tight">
+          </Typography>
+          <Typography variant="h3" sx={{ fontWeight: 700, mt: 0.5 }}>
             Users
-          </h1>
-        </div>
-        <Button 
-          className="rounded-sm btn-active w-fit"
+          </Typography>
+        </Box>
+        <Button
+          variant="contained"
+          startIcon={<Add />}
           onClick={() => setDialogOpen(true)}
           data-testid="add-new-user-button"
+          sx={{
+            borderRadius: 3,
+            py: 1.5,
+            px: 3,
+            bgcolor: '#F9B970',
+            color: '#1a1a1a',
+            fontWeight: 600,
+            '&:hover': {
+              bgcolor: '#EF5C1E',
+              color: '#fff',
+            },
+          }}
         >
-          <Plus className="mr-2 h-4 w-4" />
           Add New User
         </Button>
-      </div>
+      </Box>
 
       {/* Content */}
       {loading ? (
-        <div className="flex items-center justify-center py-24">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
+          <CircularProgress />
+        </Box>
       ) : users.length === 0 ? (
         /* Empty State */
-        <div className="empty-state border border-border rounded-sm" data-testid="empty-state">
-          <div className="p-4 bg-muted rounded-sm mb-6">
-            <Users className="h-12 w-12 text-muted-foreground" strokeWidth={1} />
-          </div>
-          <h3 className="font-heading text-xl font-semibold tracking-tight mb-2">
+        <Paper
+          elevation={0}
+          data-testid="empty-state"
+          sx={{
+            p: 8,
+            borderRadius: 4,
+            border: '1px solid',
+            borderColor: 'divider',
+            textAlign: 'center',
+          }}
+        >
+          <Box
+            sx={{
+              width: 80,
+              height: 80,
+              borderRadius: 4,
+              bgcolor: 'rgba(249, 185, 112, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              mx: 'auto',
+              mb: 3,
+            }}
+          >
+            <People sx={{ fontSize: 40, color: '#EF5C1E' }} />
+          </Box>
+          <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
             No users yet
-          </h3>
-          <p className="text-muted-foreground mb-6 max-w-sm">
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 4, maxWidth: 300, mx: 'auto' }}>
             Get started by adding your first user to the system.
-          </p>
-          <Button 
-            className="rounded-sm btn-active"
+          </Typography>
+          <Button
+            variant="contained"
+            startIcon={<Add />}
             onClick={() => setDialogOpen(true)}
             data-testid="empty-state-add-button"
+            sx={{
+              borderRadius: 3,
+              py: 1.5,
+              px: 3,
+              bgcolor: '#F9B970',
+              color: '#1a1a1a',
+              fontWeight: 600,
+              '&:hover': {
+                bgcolor: '#EF5C1E',
+                color: '#fff',
+              },
+            }}
           >
-            <Plus className="mr-2 h-4 w-4" />
             Add New User
           </Button>
-        </div>
+        </Paper>
       ) : (
         /* Users Table */
-        <div className="border border-border rounded-sm overflow-hidden" data-testid="users-table-container">
-          <Table className="data-table">
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead className="font-heading">Name</TableHead>
-                <TableHead className="font-heading">Email</TableHead>
-                <TableHead className="font-heading">Role</TableHead>
-                <TableHead className="font-heading">Created</TableHead>
-                <TableHead className="font-heading w-[80px]">Actions</TableHead>
+        <TableContainer
+          component={Paper}
+          elevation={0}
+          data-testid="users-table-container"
+          sx={{
+            borderRadius: 4,
+            border: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Table>
+            <TableHead>
+              <TableRow sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
+                <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Role</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Created</TableCell>
+                <TableCell sx={{ fontWeight: 600, width: 80 }}>Actions</TableCell>
               </TableRow>
-            </TableHeader>
+            </TableHead>
             <TableBody>
               {users.map((user) => (
-                <TableRow key={user.id} data-testid={`user-row-${user.id}`}>
-                  <TableCell className="font-medium">{user.name}</TableCell>
-                  <TableCell className="font-mono text-sm">{user.email}</TableCell>
+                <TableRow
+                  key={user.id}
+                  data-testid={`user-row-${user.id}`}
+                  sx={{ '&:hover': { bgcolor: 'rgba(0,0,0,0.02)' } }}
+                >
+                  <TableCell sx={{ fontWeight: 500 }}>{user.name}</TableCell>
+                  <TableCell>{user.email}</TableCell>
                   <TableCell>
-                    <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-muted rounded-sm capitalize">
-                      {user.role}
-                    </span>
+                    <Chip
+                      label={user.role}
+                      size="small"
+                      sx={{
+                        borderRadius: 2,
+                        bgcolor: 'rgba(249, 185, 112, 0.15)',
+                        color: '#EF5C1E',
+                        fontWeight: 500,
+                        textTransform: 'capitalize',
+                      }}
+                    />
                   </TableCell>
-                  <TableCell className="font-mono text-sm text-muted-foreground">
+                  <TableCell sx={{ color: 'text.secondary' }}>
                     {formatDate(user.created_at)}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    <IconButton
+                      size="small"
                       onClick={() => handleDeleteUser(user.id, user.name)}
                       disabled={deleting === user.id}
                       data-testid={`delete-user-${user.id}`}
+                      sx={{
+                        color: 'error.main',
+                        '&:hover': { bgcolor: 'error.lighter' },
+                      }}
                     >
                       {deleting === user.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <CircularProgress size={20} />
                       ) : (
-                        <Trash2 className="h-4 w-4" />
+                        <Delete fontSize="small" />
                       )}
-                    </Button>
+                    </IconButton>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        </div>
+        </TableContainer>
       )}
 
       {/* Total count */}
       {!loading && users.length > 0 && (
-        <p className="text-xs text-muted-foreground mt-4 font-mono" data-testid="users-total-count">
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ mt: 2 }}
+          data-testid="users-total-count"
+        >
           Total: {users.length} user{users.length !== 1 ? 's' : ''}
-        </p>
+        </Typography>
       )}
 
       {/* Create User Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md rounded-sm" data-testid="create-user-dialog">
-          <DialogHeader>
-            <DialogTitle className="font-heading text-xl tracking-tight">
-              Add New User
-            </DialogTitle>
-            <DialogDescription>
+      <Dialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        data-testid="create-user-dialog"
+        PaperProps={{
+          sx: { borderRadius: 4 }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 600 }}>Add New User</DialogTitle>
+        <form onSubmit={handleCreateUser}>
+          <DialogContent>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
               Create a new user account. All fields are required.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <form onSubmit={handleCreateUser} className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <Label 
-                htmlFor="name"
-                className="text-xs font-medium uppercase tracking-widest text-muted-foreground"
-              >
-                Full Name
-              </Label>
-              <Input
-                id="name"
-                placeholder="John Doe"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="rounded-sm"
-                data-testid="create-user-name-input"
-                disabled={creating}
-              />
-            </div>
+            </Typography>
+            
+            <TextField
+              fullWidth
+              label="Full Name"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="John Doe"
+              disabled={creating}
+              data-testid="create-user-name-input"
+              sx={{ mb: 3 }}
+              InputProps={{ sx: { borderRadius: 3 } }}
+            />
 
-            <div className="space-y-2">
-              <Label 
-                htmlFor="email"
-                className="text-xs font-medium uppercase tracking-widest text-muted-foreground"
-              >
-                Email Address
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="john@example.com"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="rounded-sm font-mono"
-                data-testid="create-user-email-input"
-                disabled={creating}
-              />
-            </div>
+            <TextField
+              fullWidth
+              label="Email Address"
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              placeholder="john@example.com"
+              disabled={creating}
+              data-testid="create-user-email-input"
+              sx={{ mb: 3 }}
+              InputProps={{ sx: { borderRadius: 3 } }}
+            />
 
-            <div className="space-y-2">
-              <Label 
-                htmlFor="role"
-                className="text-xs font-medium uppercase tracking-widest text-muted-foreground"
-              >
-                Role
-              </Label>
+            <FormControl fullWidth>
+              <InputLabel>Role</InputLabel>
               <Select
                 value={formData.role}
-                onValueChange={(value) => setFormData({ ...formData, role: value })}
+                label="Role"
+                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                 disabled={creating}
+                data-testid="create-user-role-select"
+                sx={{ borderRadius: 3 }}
               >
-                <SelectTrigger className="rounded-sm" data-testid="create-user-role-select">
-                  <SelectValue placeholder="Select a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="user">User</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="editor">Editor</SelectItem>
-                </SelectContent>
+                <MenuItem value="user">User</MenuItem>
+                <MenuItem value="admin">Admin</MenuItem>
+                <MenuItem value="editor">Editor</MenuItem>
               </Select>
-            </div>
-
-            <DialogFooter className="mt-6">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setDialogOpen(false)}
-                className="rounded-sm"
-                disabled={creating}
-                data-testid="create-user-cancel-button"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                className="rounded-sm btn-active"
-                disabled={creating}
-                data-testid="create-user-submit-button"
-              >
-                {creating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  'Create User'
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
+            </FormControl>
+          </DialogContent>
+          <DialogActions sx={{ p: 3, pt: 0 }}>
+            <Button
+              onClick={() => setDialogOpen(false)}
+              disabled={creating}
+              data-testid="create-user-cancel-button"
+              sx={{ borderRadius: 3 }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={creating}
+              data-testid="create-user-submit-button"
+              sx={{
+                borderRadius: 3,
+                bgcolor: '#F9B970',
+                color: '#1a1a1a',
+                fontWeight: 600,
+                '&:hover': {
+                  bgcolor: '#EF5C1E',
+                  color: '#fff',
+                },
+              }}
+            >
+              {creating ? <CircularProgress size={24} /> : 'Create User'}
+            </Button>
+          </DialogActions>
+        </form>
       </Dialog>
-    </div>
+    </Box>
   );
 };

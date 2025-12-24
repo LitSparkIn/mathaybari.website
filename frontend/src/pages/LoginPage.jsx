@@ -2,11 +2,18 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { Loader2, ArrowRight } from 'lucide-react';
+import {
+  Box,
+  Paper,
+  TextField,
+  Button,
+  Typography,
+  CircularProgress,
+  InputAdornment,
+  IconButton,
+} from '@mui/material';
+import { Visibility, VisibilityOff, ArrowForward } from '@mui/icons-material';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -14,6 +21,7 @@ const API = `${BACKEND_URL}/api`;
 export const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -46,106 +54,173 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className="login-split" data-testid="login-page">
+    <Box
+      data-testid="login-page"
+      sx={{
+        minHeight: '100vh',
+        display: 'grid',
+        gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' },
+      }}
+    >
       {/* Left side - Login Form */}
-      <div className="flex items-center justify-center p-8 lg:p-12">
-        <div className="w-full max-w-md">
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          p: { xs: 3, md: 6 },
+          bgcolor: 'background.paper',
+        }}
+      >
+        <Box sx={{ width: '100%', maxWidth: 400 }}>
           {/* Logo */}
-          <div className="mb-12">
-            <h1 className="font-heading text-4xl font-bold tracking-tight">
+          <Box sx={{ mb: 6 }}>
+            <Typography
+              variant="h3"
+              sx={{
+                fontWeight: 700,
+                color: '#EF5C1E',
+                letterSpacing: '-0.02em',
+              }}
+            >
               MathayBari
-            </h1>
-            <p className="text-muted-foreground mt-2">
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
               Admin Panel
-            </p>
-          </div>
+            </Typography>
+          </Box>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <Label 
-                htmlFor="email" 
-                className="text-xs font-medium uppercase tracking-widest text-muted-foreground"
-              >
-                Email Address
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="admin@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="rounded-sm h-12 font-mono"
-                data-testid="login-email-input"
-                disabled={loading}
-              />
-            </div>
+          <form onSubmit={handleSubmit}>
+            <TextField
+              fullWidth
+              label="Email Address"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin@example.com"
+              disabled={loading}
+              data-testid="login-email-input"
+              sx={{ mb: 3 }}
+              InputProps={{
+                sx: { borderRadius: 3 }
+              }}
+            />
 
-            <div className="space-y-2">
-              <Label 
-                htmlFor="password"
-                className="text-xs font-medium uppercase tracking-widest text-muted-foreground"
-              >
-                Password
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="rounded-sm h-12"
-                data-testid="login-password-input"
-                disabled={loading}
-              />
-            </div>
+            <TextField
+              fullWidth
+              label="Password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              disabled={loading}
+              data-testid="login-password-input"
+              sx={{ mb: 4 }}
+              InputProps={{
+                sx: { borderRadius: 3 },
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() => setShowPassword(!showPassword)}
+                      edge="end"
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
 
             <Button
               type="submit"
-              className="w-full h-12 rounded-sm font-medium btn-active"
+              fullWidth
+              variant="contained"
+              size="large"
               disabled={loading}
               data-testid="login-submit-button"
+              sx={{
+                py: 1.5,
+                borderRadius: 3,
+                bgcolor: '#F9B970',
+                color: '#1a1a1a',
+                fontWeight: 600,
+                '&:hover': {
+                  bgcolor: '#EF5C1E',
+                  color: '#fff',
+                },
+              }}
             >
               {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Signing in...
-                </>
+                <CircularProgress size={24} color="inherit" />
               ) : (
                 <>
                   Sign In
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                  <ArrowForward sx={{ ml: 1 }} />
                 </>
               )}
             </Button>
           </form>
 
           {/* Footer */}
-          <p className="text-xs text-muted-foreground text-center mt-8">
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: 'block', textAlign: 'center', mt: 4 }}
+          >
             Secure admin access only
-          </p>
-        </div>
-      </div>
+          </Typography>
+        </Box>
+      </Box>
 
       {/* Right side - Image */}
-      <div className="hidden lg:block relative bg-zinc-100">
-        <img
+      <Box
+        sx={{
+          display: { xs: 'none', lg: 'block' },
+          position: 'relative',
+          bgcolor: '#f5f5f5',
+        }}
+      >
+        <Box
+          component="img"
           src="https://images.unsplash.com/photo-1561518065-a76ab6e7ab50?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODF8MHwxfHNlYXJjaHwyfHxhYnN0cmFjdCUyMGdlb21ldHJpYyUyMG1pbmltYWwlMjBhcmNoaXRlY3R1cmUlMjB3aGl0ZXxlbnwwfHx8fDE3NjYwNTY1Mzd8MA&ixlib=rb-4.1.0&q=85"
           alt="Abstract geometric architecture"
-          className="absolute inset-0 w-full h-full object-cover login-image"
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            filter: 'grayscale(100%)',
+            opacity: 0.8,
+          }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-zinc-900/20 to-transparent" />
-        <div className="absolute bottom-12 left-12 right-12">
-          <blockquote className="text-white">
-            <p className="font-heading text-2xl font-semibold tracking-tight leading-relaxed">
-              "Simplicity is the ultimate sophistication."
-            </p>
-            <cite className="block mt-4 text-sm text-white/70 not-italic">
-              — Leonardo da Vinci
-            </cite>
-          </blockquote>
-        </div>
-      </div>
-    </div>
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(to top, rgba(0,0,0,0.4), transparent)',
+          }}
+        />
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: 48,
+            left: 48,
+            right: 48,
+          }}
+        >
+          <Typography
+            variant="h5"
+            sx={{ color: 'white', fontWeight: 600, lineHeight: 1.4 }}
+          >
+            "Simplicity is the ultimate sophistication."
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mt: 2 }}>
+            — Leonardo da Vinci
+          </Typography>
+        </Box>
+      </Box>
+    </Box>
   );
 };

@@ -2,8 +2,14 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { Button } from '../components/ui/button';
-import { Users, ArrowRight, Plus, Loader2 } from 'lucide-react';
+import {
+  Box,
+  Paper,
+  Typography,
+  Button,
+  CircularProgress,
+} from '@mui/material';
+import { People, ArrowForward, Add } from '@mui/icons-material';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -32,84 +38,179 @@ export const DashboardPage = () => {
   };
 
   return (
-    <div className="p-6 md:p-8 lg:p-12" data-testid="dashboard-page">
+    <Box sx={{ p: { xs: 3, md: 4, lg: 6 } }} data-testid="dashboard-page">
       {/* Header */}
-      <div className="mb-12">
-        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">
+      <Box sx={{ mb: 5 }}>
+        <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 2 }}>
           Overview
-        </p>
-        <h1 className="font-heading text-4xl md:text-5xl font-bold tracking-tight">
+        </Typography>
+        <Typography variant="h3" sx={{ fontWeight: 700, mt: 0.5 }}>
           Dashboard
-        </h1>
-      </div>
+        </Typography>
+      </Box>
 
-      {/* Bento Grid */}
-      <div className="bento-grid">
+      {/* Cards Grid */}
+      <Box
+        sx={{
+          display: 'grid',
+          gap: 3,
+          gridTemplateColumns: {
+            xs: '1fr',
+            md: 'repeat(2, 1fr)',
+            lg: 'repeat(3, 1fr)',
+          },
+        }}
+      >
         {/* User Count Card */}
-        <div className="bento-card p-8 col-span-1 md:col-span-2 lg:col-span-1" data-testid="user-count-card">
-          <div className="flex items-start justify-between mb-6">
-            <div className="p-3 bg-primary/10 rounded-sm">
-              <Users className="h-6 w-6 text-primary" strokeWidth={1.5} />
-            </div>
-          </div>
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">
+        <Paper
+          elevation={0}
+          data-testid="user-count-card"
+          sx={{
+            p: 4,
+            borderRadius: 4,
+            border: '1px solid',
+            borderColor: 'divider',
+            transition: 'all 0.2s',
+            '&:hover': {
+              borderColor: '#F9B970',
+              boxShadow: '0 4px 20px rgba(249, 185, 112, 0.15)',
+            },
+          }}
+        >
+          <Box
+            sx={{
+              width: 56,
+              height: 56,
+              borderRadius: 3,
+              bgcolor: 'rgba(249, 185, 112, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              mb: 3,
+            }}
+          >
+            <People sx={{ fontSize: 28, color: '#EF5C1E' }} />
+          </Box>
+          <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 2 }}>
             Total Users
-          </p>
+          </Typography>
           {loading ? (
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <CircularProgress size={32} sx={{ mt: 1 }} />
           ) : (
-            <p className="stat-number text-foreground" data-testid="user-count-value">
+            <Typography
+              variant="h2"
+              data-testid="user-count-value"
+              sx={{ fontWeight: 700, mt: 1 }}
+            >
               {userCount}
-            </p>
+            </Typography>
           )}
-        </div>
+        </Paper>
 
         {/* View User Listing Card */}
-        <div className="bento-card p-8 flex flex-col justify-between" data-testid="view-users-card">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">
+        <Paper
+          elevation={0}
+          data-testid="view-users-card"
+          sx={{
+            p: 4,
+            borderRadius: 4,
+            border: '1px solid',
+            borderColor: 'divider',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            transition: 'all 0.2s',
+            '&:hover': {
+              borderColor: '#F9B970',
+              boxShadow: '0 4px 20px rgba(249, 185, 112, 0.15)',
+            },
+          }}
+        >
+          <Box>
+            <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 2 }}>
               Quick Action
-            </p>
-            <h3 className="font-heading text-xl font-semibold tracking-tight mb-2">
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 600, mt: 1, mb: 1 }}>
               User Listing
-            </h3>
-            <p className="text-sm text-muted-foreground">
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
               View and manage all registered users in the system.
-            </p>
-          </div>
-          <Button 
-            className="mt-6 rounded-sm btn-active"
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
             onClick={() => navigate('/users')}
             data-testid="view-user-listing-button"
+            sx={{
+              mt: 3,
+              borderRadius: 3,
+              py: 1.5,
+              bgcolor: '#F9B970',
+              color: '#1a1a1a',
+              fontWeight: 600,
+              '&:hover': {
+                bgcolor: '#EF5C1E',
+                color: '#fff',
+              },
+            }}
           >
             View User Listing
-            <ArrowRight className="ml-2 h-4 w-4" />
+            <ArrowForward sx={{ ml: 1, fontSize: 20 }} />
           </Button>
-        </div>
+        </Paper>
 
         {/* Create New User Card */}
-        <div className="bento-card p-8 flex flex-col justify-between" data-testid="create-user-card">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">
+        <Paper
+          elevation={0}
+          data-testid="create-user-card"
+          sx={{
+            p: 4,
+            borderRadius: 4,
+            border: '1px solid',
+            borderColor: 'divider',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            transition: 'all 0.2s',
+            '&:hover': {
+              borderColor: '#F9B970',
+              boxShadow: '0 4px 20px rgba(249, 185, 112, 0.15)',
+            },
+          }}
+        >
+          <Box>
+            <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 2 }}>
               Quick Action
-            </p>
-            <h3 className="font-heading text-xl font-semibold tracking-tight mb-2">
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 600, mt: 1, mb: 1 }}>
               Add User
-            </h3>
-            <p className="text-sm text-muted-foreground">
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
               Create a new user account with custom permissions.
-            </p>
-          </div>
-          <Button 
-            className="mt-6 rounded-sm btn-active"
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
             onClick={() => navigate('/users?action=create')}
             data-testid="create-new-user-button"
+            sx={{
+              mt: 3,
+              borderRadius: 3,
+              py: 1.5,
+              bgcolor: '#F9B970',
+              color: '#1a1a1a',
+              fontWeight: 600,
+              '&:hover': {
+                bgcolor: '#EF5C1E',
+                color: '#fff',
+              },
+            }}
           >
-            <Plus className="mr-2 h-4 w-4" />
+            <Add sx={{ mr: 1, fontSize: 20 }} />
             Create New User
           </Button>
-        </div>
-      </div>
-    </div>
+        </Paper>
+      </Box>
+    </Box>
   );
 };
