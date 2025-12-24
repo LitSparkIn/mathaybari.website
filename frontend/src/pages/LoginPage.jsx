@@ -53,7 +53,7 @@ export const LoginPage = () => {
           {/* Logo */}
           <div className="mb-12">
             <h1 className="font-heading text-4xl font-bold tracking-tight">
-              DICER
+              MathayBari
             </h1>
             <p className="text-muted-foreground mt-2">
               Admin Panel

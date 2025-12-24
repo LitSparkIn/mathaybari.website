@@ -167,7 +167,7 @@ async def get_users_count(email: str = Depends(verify_jwt_token)):
 # Health check
 @api_router.get("/")
 async def root():
-    return {"message": "Dicer Admin API"}
+    return {"message": "MathayBari Admin API"}
 
 # Include the router in the main app
 app.include_router(api_router)
