@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,21 +6,21 @@
 
 body {
     margin: 0;
-    font-family: 'Space Mono', monospace;
+    font-family: 'Noto Sans', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
 
 .font-heading {
-    font-family: 'Space Mono', monospace;
+    font-family: 'Noto Sans', sans-serif;
 }
 
 .font-mono {
-    font-family: 'Space Mono', monospace;
+    font-family: 'Noto Sans', sans-serif;
 }
 
 code {
-    font-family: 'Space Mono', monospace;
+    font-family: 'Noto Sans', sans-serif;
 }
 
 @layer base {
