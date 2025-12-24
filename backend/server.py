@@ -179,6 +179,7 @@ async def user_login(request: UserLoginRequest):
         "user_id": user["user_id"],
         "name": user["name"],
         "phone": user["phone"],
+        "device_id": user.get("device_number") if user.get("device_number") else None,
         "status": user["status"],
         "message": "Login successful"
     })
@@ -258,13 +259,21 @@ async def delete_user(user_id: int, email: str = Depends(verify_jwt_token)):
     })
 
 @api_router.patch("/users/{user_id}/status")
-async def update_user_status(user_id: int, status: str, email: str = Depends(verify_jwt_token)):
+async def update_user_status(user_id: int, status: str, device_number: str = None, email: str = Depends(verify_jwt_token)):
     if status not in ["Active", "Inactive"]:
         return error_response("Status must be 'Active' or 'Inactive'", 400)
     
+    # Device number is required when activating
+    if status == "Active" and not device_number:
+        return error_response("Device number is required when activating a user", 400)
+    
+    update_data = {"status": status}
+    if status == "Active" and device_number:
+        update_data["device_number"] = device_number
+    
     result = await db.users.update_one(
         {"user_id": user_id},
-        {"$set": {"status": status}}
+        {"$set": update_data}
     )
     
     if result.matched_count == 0:
@@ -272,7 +281,8 @@ async def update_user_status(user_id: int, status: str, email: str = Depends(ver
     
     return success_response({
         "message": f"User status updated to {status}",
-        "user_id": user_id
+        "user_id": user_id,
+        "device_number": device_number if status == "Active" else None
     })
 
 @api_router.get("/users/count")
