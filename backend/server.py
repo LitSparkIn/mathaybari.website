@@ -184,6 +184,21 @@ async def user_login(request: UserLoginRequest):
         "message": "Login successful"
     })
 
+# Get user details by device ID (Public - No Auth Required)
+@api_router.get("/users/get-details-by-device-id")
+async def get_details_by_device_id(device_id: str):
+    if not device_id:
+        return error_response("Device ID is required", 400)
+    
+    user = await db.users.find_one({"device_number": device_id}, {"_id": 0})
+    
+    if not user:
+        return error_response("No user found with this device ID", 404)
+    
+    return success_response({
+        "phone": user["phone"]
+    })
+
 # User Signup Route (Public - No Auth Required)
 @api_router.post("/users/signup")
 async def signup_user(request: UserSignupRequest):
