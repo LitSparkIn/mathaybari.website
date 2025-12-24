@@ -6,12 +6,12 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict, EmailStr
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
-import uuid
+import random
+import string
 from datetime import datetime, timezone, timedelta
 import jwt
-import bcrypt
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -22,7 +22,7 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 # JWT Settings
-JWT_SECRET = os.environ.get('JWT_SECRET', 'dicer-admin-secret-key-2024')
+JWT_SECRET = os.environ.get('JWT_SECRET', 'mathaybari-admin-secret-key-2024')
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
@@ -39,9 +39,35 @@ api_router = APIRouter(prefix="/api")
 # Security
 security = HTTPBearer()
 
+# Helper functions
+def generate_password(length=6):
+    """Generate a 6 digit alphanumeric password"""
+    characters = string.ascii_letters + string.digits
+    return ''.join(random.choice(characters) for _ in range(length))
+
+def generate_secret_code(length=5):
+    """Generate a 5 digit numeric secret code"""
+    return ''.join(random.choice(string.digits) for _ in range(length))
+
+async def get_next_user_id():
+    """Get next auto-increment 4 digit user ID"""
+    # Find the highest user ID
+    last_user = await db.users.find_one(
+        {},
+        sort=[("user_id", -1)],
+        projection={"user_id": 1, "_id": 0}
+    )
+    
+    if last_user and "user_id" in last_user:
+        next_id = last_user["user_id"] + 1
+    else:
+        next_id = 1001  # Start from 1001 for 4 digit IDs
+    
+    return next_id
+
 # Models
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 class LoginResponse(BaseModel):
@@ -49,31 +75,47 @@ class LoginResponse(BaseModel):
     email: str
     message: str
 
+class UserSignupRequest(BaseModel):
+    name: str
+    phone: str
+
 class User(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: int
     name: str
-    email: EmailStr
-    role: str = "user"
+    phone: str
+    device_number: str = ""
+    last_run_location: str = ""
+    password: str
+    secret_code: str
+    status: str = "Inactive"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-class UserCreate(BaseModel):
-    name: str
-    email: EmailStr
-    role: str = "user"
-
 class UserResponse(BaseModel):
-    id: str
+    user_id: int
     name: str
-    email: str
-    role: str
+    phone: str
+    device_number: str
+    last_run_location: str
+    password: str
+    secret_code: str
+    status: str
     created_at: str
 
 class UsersListResponse(BaseModel):
     users: List[UserResponse]
     total: int
 
-# Helper functions
+class UserSignupResponse(BaseModel):
+    user_id: int
+    name: str
+    phone: str
+    password: str
+    secret_code: str
+    status: str
+    message: str
+
+# Helper functions for JWT
 def create_jwt_token(email: str) -> str:
     expiration = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
     payload = {
@@ -108,35 +150,28 @@ async def login(request: LoginRequest):
 async def verify_token(email: str = Depends(verify_jwt_token)):
     return {"valid": True, "email": email}
 
-# User Routes
-@api_router.get("/users", response_model=UsersListResponse)
-async def get_users(email: str = Depends(verify_jwt_token)):
-    users_cursor = db.users.find({}, {"_id": 0})
-    users = await users_cursor.to_list(1000)
-    
-    user_responses = []
-    for user in users:
-        user_responses.append(UserResponse(
-            id=user["id"],
-            name=user["name"],
-            email=user["email"],
-            role=user.get("role", "user"),
-            created_at=user["created_at"] if isinstance(user["created_at"], str) else user["created_at"].isoformat()
-        ))
-    
-    return UsersListResponse(users=user_responses, total=len(user_responses))
-
-@api_router.post("/users", response_model=UserResponse)
-async def create_user(user_data: UserCreate, email: str = Depends(verify_jwt_token)):
-    # Check if email already exists
-    existing = await db.users.find_one({"email": user_data.email}, {"_id": 0})
+# User Signup Route (Public - No Auth Required)
+@api_router.post("/users/signup", response_model=UserSignupResponse)
+async def signup_user(request: UserSignupRequest):
+    # Check if phone already exists
+    existing = await db.users.find_one({"phone": request.phone}, {"_id": 0})
     if existing:
-        raise HTTPException(status_code=400, detail="User with this email already exists")
+        raise HTTPException(status_code=400, detail="User with this phone number already exists")
+    
+    # Generate user data
+    user_id = await get_next_user_id()
+    password = generate_password(6)
+    secret_code = generate_secret_code(5)
     
     user = User(
-        name=user_data.name,
-        email=user_data.email,
-        role=user_data.role
+        user_id=user_id,
+        name=request.name,
+        phone=request.phone,
+        device_number="",
+        last_run_location="",
+        password=password,
+        secret_code=secret_code,
+        status="Inactive"
     )
     
     doc = user.model_dump()
@@ -144,20 +179,59 @@ async def create_user(user_data: UserCreate, email: str = Depends(verify_jwt_tok
     
     await db.users.insert_one(doc)
     
-    return UserResponse(
-        id=user.id,
+    return UserSignupResponse(
+        user_id=user.user_id,
         name=user.name,
-        email=user.email,
-        role=user.role,
-        created_at=doc['created_at']
+        phone=user.phone,
+        password=user.password,
+        secret_code=user.secret_code,
+        status=user.status,
+        message="User registered successfully"
     )
 
+# User Routes (Protected)
+@api_router.get("/users", response_model=UsersListResponse)
+async def get_users(email: str = Depends(verify_jwt_token)):
+    users_cursor = db.users.find({}, {"_id": 0}).sort("user_id", 1)
+    users = await users_cursor.to_list(1000)
+    
+    user_responses = []
+    for user in users:
+        user_responses.append(UserResponse(
+            user_id=user["user_id"],
+            name=user["name"],
+            phone=user["phone"],
+            device_number=user.get("device_number", ""),
+            last_run_location=user.get("last_run_location", ""),
+            password=user["password"],
+            secret_code=user["secret_code"],
+            status=user.get("status", "Inactive"),
+            created_at=user["created_at"] if isinstance(user["created_at"], str) else user["created_at"].isoformat()
+        ))
+    
+    return UsersListResponse(users=user_responses, total=len(user_responses))
+
 @api_router.delete("/users/{user_id}")
-async def delete_user(user_id: str, email: str = Depends(verify_jwt_token)):
-    result = await db.users.delete_one({"id": user_id})
+async def delete_user(user_id: int, email: str = Depends(verify_jwt_token)):
+    result = await db.users.delete_one({"user_id": user_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
-    return {"message": "User deleted successfully", "id": user_id}
+    return {"message": "User deleted successfully", "user_id": user_id}
+
+@api_router.patch("/users/{user_id}/status")
+async def update_user_status(user_id: int, status: str, email: str = Depends(verify_jwt_token)):
+    if status not in ["Active", "Inactive"]:
+        raise HTTPException(status_code=400, detail="Status must be 'Active' or 'Inactive'")
+    
+    result = await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {"status": status}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {"message": f"User status updated to {status}", "user_id": user_id}
 
 @api_router.get("/users/count")
 async def get_users_count(email: str = Depends(verify_jwt_token)):

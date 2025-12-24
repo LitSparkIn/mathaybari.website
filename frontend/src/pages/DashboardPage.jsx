@@ -9,7 +9,7 @@ import {
   Button,
   CircularProgress,
 } from '@mui/material';
-import { People, ArrowForward, Add } from '@mui/icons-material';
+import { People, ArrowForward } from '@mui/icons-material';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -57,7 +57,6 @@ export const DashboardPage = () => {
           gridTemplateColumns: {
             xs: '1fr',
             md: 'repeat(2, 1fr)',
-            lg: 'repeat(3, 1fr)',
           },
         }}
       >
@@ -156,58 +155,6 @@ export const DashboardPage = () => {
           >
             View User Listing
             <ArrowForward sx={{ ml: 1, fontSize: 20 }} />
-          </Button>
-        </Paper>
-
-        {/* Create New User Card */}
-        <Paper
-          elevation={0}
-          data-testid="create-user-card"
-          sx={{
-            p: 4,
-            borderRadius: 4,
-            border: '1px solid',
-            borderColor: 'divider',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            transition: 'all 0.2s',
-            '&:hover': {
-              borderColor: '#F9B970',
-              boxShadow: '0 4px 20px rgba(249, 185, 112, 0.15)',
-            },
-          }}
-        >
-          <Box>
-            <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 2 }}>
-              Quick Action
-            </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 600, mt: 1, mb: 1 }}>
-              Add User
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Create a new user account with custom permissions.
-            </Typography>
-          </Box>
-          <Button
-            variant="contained"
-            onClick={() => navigate('/users?action=create')}
-            data-testid="create-new-user-button"
-            sx={{
-              mt: 3,
-              borderRadius: 3,
-              py: 1.5,
-              bgcolor: '#F9B970',
-              color: '#1a1a1a',
-              fontWeight: 600,
-              '&:hover': {
-                bgcolor: '#EF5C1E',
-                color: '#fff',
-              },
-            }}
-          >
-            <Add sx={{ mr: 1, fontSize: 20 }} />
-            Create New User
           </Button>
         </Paper>
       </Box>
