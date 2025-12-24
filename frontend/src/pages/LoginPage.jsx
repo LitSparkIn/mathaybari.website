@@ -42,7 +42,7 @@ export const LoginPage = () => {
         password
       });
       
-      login(response.data.token, response.data.email);
+      login(response.data.data.token, response.data.data.email);
       toast.success('Login successful');
       navigate('/dashboard');
     } catch (error) {

@@ -29,7 +29,7 @@ export const DashboardPage = () => {
       const response = await axios.get(`${API}/users/count`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setUserCount(response.data.count);
+      setUserCount(response.data.data.count);
     } catch (error) {
       console.error('Failed to fetch user count:', error);
     } finally {

@@ -39,7 +39,7 @@ export const UsersPage = () => {
       const response = await axios.get(`${API}/users`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setUsers(response.data.users);
+      setUsers(response.data.data.users);
     } catch (error) {
       toast.error('Failed to fetch users');
       console.error('Failed to fetch users:', error);
