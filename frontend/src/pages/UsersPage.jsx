@@ -7,6 +7,11 @@ import {
   Paper,
   Typography,
   Button,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   Table,
   TableBody,
   TableCell,
@@ -29,6 +34,12 @@ export const UsersPage = () => {
   const [deleting, setDeleting] = useState(null);
   const [togglingStatus, setTogglingStatus] = useState(null);
   const { token } = useAuth();
+
+  // Activation modal state
+  const [activateDialogOpen, setActivateDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [deviceNumber, setDeviceNumber] = useState('');
+  const [activating, setActivating] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -69,23 +80,76 @@ export const UsersPage = () => {
     }
   };
 
-  const handleToggleStatus = async (userId, currentStatus) => {
-    const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
+  const handleToggleStatus = (user) => {
+    if (user.status === 'Active') {
+      // Deactivate directly
+      updateStatus(user.user_id, 'Inactive');
+    } else {
+      // Show modal for activation
+      setSelectedUser(user);
+      setDeviceNumber(user.device_number || '');
+      setActivateDialogOpen(true);
+    }
+  };
+
+  const updateStatus = async (userId, status, deviceNum = null) => {
     setTogglingStatus(userId);
     
     try {
-      await axios.patch(
-        `${API}/users/${userId}/status?status=${newStatus}`,
+      let url = `${API}/users/${userId}/status?status=${status}`;
+      if (deviceNum) {
+        url += `&device_number=${encodeURIComponent(deviceNum)}`;
+      }
+      
+      const response = await axios.patch(
+        url,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
-      toast.success(`User status updated to ${newStatus}`);
-      fetchUsers();
+      if (response.data.status === 'success') {
+        toast.success(`User status updated to ${status}`);
+        fetchUsers();
+      } else {
+        toast.error(response.data.data.message || 'Failed to update status');
+      }
     } catch (error) {
-      toast.error('Failed to update user status');
+      toast.error(error.response?.data?.data?.message || 'Failed to update user status');
     } finally {
       setTogglingStatus(null);
+    }
+  };
+
+  const handleActivateUser = async () => {
+    if (!deviceNumber.trim()) {
+      toast.error('Device number is required');
+      return;
+    }
+
+    setActivating(true);
+    
+    try {
+      const url = `${API}/users/${selectedUser.user_id}/status?status=Active&device_number=${encodeURIComponent(deviceNumber)}`;
+      
+      const response = await axios.patch(
+        url,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (response.data.status === 'success') {
+        toast.success('User activated successfully');
+        setActivateDialogOpen(false);
+        setSelectedUser(null);
+        setDeviceNumber('');
+        fetchUsers();
+      } else {
+        toast.error(response.data.data.message || 'Failed to activate user');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.data?.message || 'Failed to activate user');
+    } finally {
+      setActivating(false);
     }
   };
 
@@ -219,7 +283,7 @@ export const UsersPage = () => {
                       <Tooltip title={user.status === 'Active' ? 'Deactivate' : 'Activate'}>
                         <IconButton
                           size="small"
-                          onClick={() => handleToggleStatus(user.user_id, user.status)}
+                          onClick={() => handleToggleStatus(user)}
                           disabled={togglingStatus === user.user_id}
                           data-testid={`toggle-status-${user.user_id}`}
                           sx={{
@@ -278,6 +342,72 @@ export const UsersPage = () => {
           Total: {users.length} user{users.length !== 1 ? 's' : ''}
         </Typography>
       )}
+
+      {/* Activate User Dialog */}
+      <Dialog
+        open={activateDialogOpen}
+        onClose={() => {
+          setActivateDialogOpen(false);
+          setSelectedUser(null);
+          setDeviceNumber('');
+        }}
+        maxWidth="sm"
+        fullWidth
+        data-testid="activate-user-dialog"
+        PaperProps={{
+          sx: { borderRadius: 4 }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 600 }}>Activate User</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Enter the device number to activate <strong>{selectedUser?.name}</strong>.
+          </Typography>
+          
+          <TextField
+            fullWidth
+            label="Device Number"
+            value={deviceNumber}
+            onChange={(e) => setDeviceNumber(e.target.value)}
+            placeholder="Enter device number"
+            disabled={activating}
+            required
+            data-testid="activate-device-number-input"
+            InputProps={{ sx: { borderRadius: 3 } }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button
+            onClick={() => {
+              setActivateDialogOpen(false);
+              setSelectedUser(null);
+              setDeviceNumber('');
+            }}
+            disabled={activating}
+            data-testid="activate-cancel-button"
+            sx={{ borderRadius: 3 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleActivateUser}
+            disabled={activating || !deviceNumber.trim()}
+            data-testid="activate-submit-button"
+            sx={{
+              borderRadius: 3,
+              bgcolor: '#4caf50',
+              color: '#fff',
+              fontWeight: 600,
+              '&:hover': {
+                bgcolor: '#388e3c',
+              },
+            }}
+          >
+            {activating ? <CircularProgress size={24} color="inherit" /> : 'Activate User'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
