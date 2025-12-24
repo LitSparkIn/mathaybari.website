@@ -87,6 +87,10 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+class UserLoginRequest(BaseModel):
+    phone: str
+    password: str
+
 class UserSignupRequest(BaseModel):
     name: str
     phone: str
@@ -108,6 +112,17 @@ def create_jwt_token(email: str) -> str:
     expiration = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
     payload = {
         "sub": email,
+        "exp": expiration,
+        "iat": datetime.now(timezone.utc)
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def create_user_jwt_token(user_id: int, phone: str) -> str:
+    expiration = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
+    payload = {
+        "sub": str(user_id),
+        "phone": phone,
+        "type": "user",
         "exp": expiration,
         "iat": datetime.now(timezone.utc)
     }
@@ -139,6 +154,33 @@ async def verify_token(email: str = Depends(verify_jwt_token)):
     return success_response({
         "valid": True,
         "email": email
+    })
+
+# User Login Route (Public - No Auth Required)
+@api_router.post("/users/login")
+async def user_login(request: UserLoginRequest):
+    # Find user by phone
+    user = await db.users.find_one({"phone": request.phone}, {"_id": 0})
+    
+    if not user:
+        return error_response("User not found", 404)
+    
+    if user["password"] != request.password:
+        return error_response("Invalid credentials", 401)
+    
+    if user["status"] != "Active":
+        return error_response("Account is inactive. Please contact admin.", 403)
+    
+    # Generate JWT token
+    token = create_user_jwt_token(user["user_id"], user["phone"])
+    
+    return success_response({
+        "token": token,
+        "user_id": user["user_id"],
+        "name": user["name"],
+        "phone": user["phone"],
+        "status": user["status"],
+        "message": "Login successful"
     })
 
 # User Signup Route (Public - No Auth Required)
