@@ -424,6 +424,32 @@ async def reset_secret_code(user_id: int, email: str = Depends(verify_jwt_token)
         "new_secret_code": new_secret_code
     })
 
+# Update Device Details (Protected)
+@api_router.patch("/users/{user_id}/device")
+async def update_device_details(user_id: int, device_number: str, device_mac_address: str, email: str = Depends(verify_jwt_token)):
+    if not device_number:
+        return error_response("Device number is required", 400)
+    if not device_mac_address:
+        return error_response("Device MAC address is required", 400)
+    
+    result = await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {
+            "device_number": device_number,
+            "device_mac_address": device_mac_address
+        }}
+    )
+    
+    if result.matched_count == 0:
+        return error_response("User not found", 404)
+    
+    return success_response({
+        "message": "Device details updated successfully.",
+        "user_id": user_id,
+        "device_number": device_number,
+        "device_mac_address": device_mac_address
+    })
+
 # Health check
 @api_router.get("/")
 async def root():
