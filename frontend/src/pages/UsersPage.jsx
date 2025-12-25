@@ -23,7 +23,7 @@ import {
   Chip,
   Tooltip,
 } from '@mui/material';
-import { Delete, People, CheckCircle, Cancel, Key, VpnKey } from '@mui/icons-material';
+import { Delete, People, CheckCircle, Cancel, Key, VpnKey, Edit } from '@mui/icons-material';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -43,6 +43,12 @@ export const UsersPage = () => {
   const [deviceNumber, setDeviceNumber] = useState('');
   const [deviceMacAddress, setDeviceMacAddress] = useState('');
   const [activating, setActivating] = useState(false);
+
+  // Edit device modal state
+  const [editDeviceDialogOpen, setEditDeviceDialogOpen] = useState(false);
+  const [editDeviceNumber, setEditDeviceNumber] = useState('');
+  const [editDeviceMacAddress, setEditDeviceMacAddress] = useState('');
+  const [editingDevice, setEditingDevice] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -85,10 +91,8 @@ export const UsersPage = () => {
 
   const handleToggleStatus = (user) => {
     if (user.status === 'Active') {
-      // Deactivate directly
       updateStatus(user.user_id, 'Inactive');
     } else {
-      // Show modal for activation
       setSelectedUser(user);
       setDeviceNumber(user.device_number || '');
       setDeviceMacAddress(user.device_mac_address || '');
@@ -154,6 +158,51 @@ export const UsersPage = () => {
       toast.error(error.response?.data?.data?.message || 'Failed to activate user');
     } finally {
       setActivating(false);
+    }
+  };
+
+  const handleEditDevice = (user) => {
+    setSelectedUser(user);
+    setEditDeviceNumber(user.device_number || '');
+    setEditDeviceMacAddress(user.device_mac_address || '');
+    setEditDeviceDialogOpen(true);
+  };
+
+  const handleSaveDevice = async () => {
+    if (!editDeviceNumber.trim()) {
+      toast.error('Device number is required');
+      return;
+    }
+    if (!editDeviceMacAddress.trim()) {
+      toast.error('Device MAC address is required');
+      return;
+    }
+
+    setEditingDevice(true);
+    
+    try {
+      const url = `${API}/users/${selectedUser.user_id}/device?device_number=${encodeURIComponent(editDeviceNumber)}&device_mac_address=${encodeURIComponent(editDeviceMacAddress)}`;
+      
+      const response = await axios.patch(
+        url,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (response.data.status === 'success') {
+        toast.success('Device details updated successfully');
+        setEditDeviceDialogOpen(false);
+        setSelectedUser(null);
+        setEditDeviceNumber('');
+        setEditDeviceMacAddress('');
+        fetchUsers();
+      } else {
+        toast.error(response.data.data.message || 'Failed to update device details');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.data?.message || 'Failed to update device details');
+    } finally {
+      setEditingDevice(false);
     }
   };
 
@@ -232,7 +281,6 @@ export const UsersPage = () => {
           <CircularProgress />
         </Box>
       ) : users.length === 0 ? (
-        /* Empty State */
         <Paper
           elevation={0}
           data-testid="empty-state"
@@ -267,7 +315,6 @@ export const UsersPage = () => {
           </Typography>
         </Paper>
       ) : (
-        /* Users Table */
         <TableContainer
           component={Paper}
           elevation={0}
@@ -290,7 +337,7 @@ export const UsersPage = () => {
                 <TableCell sx={{ fontWeight: 600 }}>Password</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Secret Code</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 600, width: 180 }}>Actions</TableCell>
+                <TableCell sx={{ fontWeight: 600, width: 200 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -356,6 +403,19 @@ export const UsersPage = () => {
                           ) : (
                             <CheckCircle fontSize="small" />
                           )}
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Edit Device">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleEditDevice(user)}
+                          data-testid={`edit-device-${user.user_id}`}
+                          sx={{
+                            color: '#9c27b0',
+                            '&:hover': { bgcolor: 'rgba(156, 39, 176, 0.1)' },
+                          }}
+                        >
+                          <Edit fontSize="small" />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Reset Password">
@@ -445,9 +505,7 @@ export const UsersPage = () => {
         maxWidth="sm"
         fullWidth
         data-testid="activate-user-dialog"
-        PaperProps={{
-          sx: { borderRadius: 4 }
-        }}
+        PaperProps={{ sx: { borderRadius: 4 } }}
       >
         <DialogTitle sx={{ fontWeight: 600 }}>Activate User</DialogTitle>
         <DialogContent>
@@ -489,7 +547,6 @@ export const UsersPage = () => {
               setDeviceMacAddress('');
             }}
             disabled={activating}
-            data-testid="activate-cancel-button"
             sx={{ borderRadius: 3 }}
           >
             Cancel
@@ -498,18 +555,90 @@ export const UsersPage = () => {
             variant="contained"
             onClick={handleActivateUser}
             disabled={activating || !deviceNumber.trim() || !deviceMacAddress.trim()}
-            data-testid="activate-submit-button"
             sx={{
               borderRadius: 3,
               bgcolor: '#4caf50',
               color: '#fff',
               fontWeight: 600,
-              '&:hover': {
-                bgcolor: '#388e3c',
-              },
+              '&:hover': { bgcolor: '#388e3c' },
             }}
           >
             {activating ? <CircularProgress size={24} color="inherit" /> : 'Activate User'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Device Dialog */}
+      <Dialog
+        open={editDeviceDialogOpen}
+        onClose={() => {
+          setEditDeviceDialogOpen(false);
+          setSelectedUser(null);
+          setEditDeviceNumber('');
+          setEditDeviceMacAddress('');
+        }}
+        maxWidth="sm"
+        fullWidth
+        data-testid="edit-device-dialog"
+        PaperProps={{ sx: { borderRadius: 4 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 600 }}>Edit Device Details</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Update device details for <strong>{selectedUser?.name}</strong>.
+          </Typography>
+          
+          <TextField
+            fullWidth
+            label="Device Number"
+            value={editDeviceNumber}
+            onChange={(e) => setEditDeviceNumber(e.target.value)}
+            placeholder="Enter device number"
+            disabled={editingDevice}
+            required
+            data-testid="edit-device-number-input"
+            sx={{ mb: 3 }}
+            InputProps={{ sx: { borderRadius: 3 } }}
+          />
+
+          <TextField
+            fullWidth
+            label="Device MAC Address"
+            value={editDeviceMacAddress}
+            onChange={(e) => setEditDeviceMacAddress(e.target.value)}
+            placeholder="e.g., AA:BB:CC:DD:EE:FF"
+            disabled={editingDevice}
+            required
+            data-testid="edit-device-mac-input"
+            InputProps={{ sx: { borderRadius: 3 } }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button
+            onClick={() => {
+              setEditDeviceDialogOpen(false);
+              setSelectedUser(null);
+              setEditDeviceNumber('');
+              setEditDeviceMacAddress('');
+            }}
+            disabled={editingDevice}
+            sx={{ borderRadius: 3 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveDevice}
+            disabled={editingDevice || !editDeviceNumber.trim() || !editDeviceMacAddress.trim()}
+            sx={{
+              borderRadius: 3,
+              bgcolor: '#9c27b0',
+              color: '#fff',
+              fontWeight: 600,
+              '&:hover': { bgcolor: '#7b1fa2' },
+            }}
+          >
+            {editingDevice ? <CircularProgress size={24} color="inherit" /> : 'Save Changes'}
           </Button>
         </DialogActions>
       </Dialog>
