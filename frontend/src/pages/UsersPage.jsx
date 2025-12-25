@@ -23,7 +23,7 @@ import {
   Chip,
   Tooltip,
 } from '@mui/material';
-import { Delete, People, CheckCircle, Cancel } from '@mui/icons-material';
+import { Delete, People, CheckCircle, Cancel, Key, VpnKey } from '@mui/icons-material';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -33,12 +33,15 @@ export const UsersPage = () => {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(null);
   const [togglingStatus, setTogglingStatus] = useState(null);
+  const [resettingPassword, setResettingPassword] = useState(null);
+  const [resettingSecretCode, setResettingSecretCode] = useState(null);
   const { token } = useAuth();
 
   // Activation modal state
   const [activateDialogOpen, setActivateDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [deviceNumber, setDeviceNumber] = useState('');
+  const [deviceMacAddress, setDeviceMacAddress] = useState('');
   const [activating, setActivating] = useState(false);
 
   useEffect(() => {
@@ -88,21 +91,17 @@ export const UsersPage = () => {
       // Show modal for activation
       setSelectedUser(user);
       setDeviceNumber(user.device_number || '');
+      setDeviceMacAddress(user.device_mac_address || '');
       setActivateDialogOpen(true);
     }
   };
 
-  const updateStatus = async (userId, status, deviceNum = null) => {
+  const updateStatus = async (userId, status) => {
     setTogglingStatus(userId);
     
     try {
-      let url = `${API}/users/${userId}/status?status=${status}`;
-      if (deviceNum) {
-        url += `&device_number=${encodeURIComponent(deviceNum)}`;
-      }
-      
       const response = await axios.patch(
-        url,
+        `${API}/users/${userId}/status?status=${status}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -125,11 +124,15 @@ export const UsersPage = () => {
       toast.error('Device number is required');
       return;
     }
+    if (!deviceMacAddress.trim()) {
+      toast.error('Device MAC address is required');
+      return;
+    }
 
     setActivating(true);
     
     try {
-      const url = `${API}/users/${selectedUser.user_id}/status?status=Active&device_number=${encodeURIComponent(deviceNumber)}`;
+      const url = `${API}/users/${selectedUser.user_id}/status?status=Active&device_number=${encodeURIComponent(deviceNumber)}&device_mac_address=${encodeURIComponent(deviceMacAddress)}`;
       
       const response = await axios.patch(
         url,
@@ -142,6 +145,7 @@ export const UsersPage = () => {
         setActivateDialogOpen(false);
         setSelectedUser(null);
         setDeviceNumber('');
+        setDeviceMacAddress('');
         fetchUsers();
       } else {
         toast.error(response.data.data.message || 'Failed to activate user');
@@ -153,12 +157,58 @@ export const UsersPage = () => {
     }
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+  const handleResetPassword = async (userId, userName) => {
+    if (!window.confirm(`Reset password for ${userName}? This will invalidate their current session.`)) {
+      return;
+    }
+
+    setResettingPassword(userId);
+    
+    try {
+      const response = await axios.patch(
+        `${API}/users/${userId}/reset-password`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (response.data.status === 'success') {
+        toast.success(`Password reset! New password: ${response.data.data.new_password}`);
+        fetchUsers();
+      } else {
+        toast.error(response.data.data.message || 'Failed to reset password');
+      }
+    } catch (error) {
+      toast.error('Failed to reset password');
+    } finally {
+      setResettingPassword(null);
+    }
+  };
+
+  const handleResetSecretCode = async (userId, userName) => {
+    if (!window.confirm(`Reset secret code for ${userName}?`)) {
+      return;
+    }
+
+    setResettingSecretCode(userId);
+    
+    try {
+      const response = await axios.patch(
+        `${API}/users/${userId}/reset-secret-code`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (response.data.status === 'success') {
+        toast.success(`Secret code reset! New code: ${response.data.data.new_secret_code}`);
+        fetchUsers();
+      } else {
+        toast.error(response.data.data.message || 'Failed to reset secret code');
+      }
+    } catch (error) {
+      toast.error('Failed to reset secret code');
+    } finally {
+      setResettingSecretCode(null);
+    }
   };
 
   return (
@@ -228,18 +278,19 @@ export const UsersPage = () => {
             borderColor: 'divider',
           }}
         >
-          <Table>
+          <Table size="small">
             <TableHead>
               <TableRow sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
                 <TableCell sx={{ fontWeight: 600 }}>ID</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Phone</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Device Number</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>MAC Address</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Last Run Location</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Password</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Secret Code</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 600, width: 100 }}>Actions</TableCell>
+                <TableCell sx={{ fontWeight: 600, width: 180 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -254,6 +305,9 @@ export const UsersPage = () => {
                   <TableCell>{user.phone}</TableCell>
                   <TableCell sx={{ color: user.device_number ? 'text.primary' : 'text.disabled' }}>
                     {user.device_number || '—'}
+                  </TableCell>
+                  <TableCell sx={{ color: user.device_mac_address ? 'text.primary' : 'text.disabled', fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                    {user.device_mac_address || '—'}
                   </TableCell>
                   <TableCell sx={{ color: user.last_run_location ? 'text.primary' : 'text.disabled' }}>
                     {user.last_run_location || '—'}
@@ -296,11 +350,47 @@ export const UsersPage = () => {
                           }}
                         >
                           {togglingStatus === user.user_id ? (
-                            <CircularProgress size={20} />
+                            <CircularProgress size={18} />
                           ) : user.status === 'Active' ? (
                             <Cancel fontSize="small" />
                           ) : (
                             <CheckCircle fontSize="small" />
+                          )}
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Reset Password">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleResetPassword(user.user_id, user.name)}
+                          disabled={resettingPassword === user.user_id}
+                          data-testid={`reset-password-${user.user_id}`}
+                          sx={{
+                            color: '#F9B970',
+                            '&:hover': { bgcolor: 'rgba(249, 185, 112, 0.1)' },
+                          }}
+                        >
+                          {resettingPassword === user.user_id ? (
+                            <CircularProgress size={18} />
+                          ) : (
+                            <Key fontSize="small" />
+                          )}
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Reset Secret Code">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleResetSecretCode(user.user_id, user.name)}
+                          disabled={resettingSecretCode === user.user_id}
+                          data-testid={`reset-secret-${user.user_id}`}
+                          sx={{
+                            color: '#2196f3',
+                            '&:hover': { bgcolor: 'rgba(33, 150, 243, 0.1)' },
+                          }}
+                        >
+                          {resettingSecretCode === user.user_id ? (
+                            <CircularProgress size={18} />
+                          ) : (
+                            <VpnKey fontSize="small" />
                           )}
                         </IconButton>
                       </Tooltip>
@@ -316,7 +406,7 @@ export const UsersPage = () => {
                           }}
                         >
                           {deleting === user.user_id ? (
-                            <CircularProgress size={20} />
+                            <CircularProgress size={18} />
                           ) : (
                             <Delete fontSize="small" />
                           )}
@@ -350,6 +440,7 @@ export const UsersPage = () => {
           setActivateDialogOpen(false);
           setSelectedUser(null);
           setDeviceNumber('');
+          setDeviceMacAddress('');
         }}
         maxWidth="sm"
         fullWidth
@@ -361,7 +452,7 @@ export const UsersPage = () => {
         <DialogTitle sx={{ fontWeight: 600 }}>Activate User</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Enter the device number to activate <strong>{selectedUser?.name}</strong>.
+            Enter the device details to activate <strong>{selectedUser?.name}</strong>.
           </Typography>
           
           <TextField
@@ -373,6 +464,19 @@ export const UsersPage = () => {
             disabled={activating}
             required
             data-testid="activate-device-number-input"
+            sx={{ mb: 3 }}
+            InputProps={{ sx: { borderRadius: 3 } }}
+          />
+
+          <TextField
+            fullWidth
+            label="Device MAC Address"
+            value={deviceMacAddress}
+            onChange={(e) => setDeviceMacAddress(e.target.value)}
+            placeholder="e.g., AA:BB:CC:DD:EE:FF"
+            disabled={activating}
+            required
+            data-testid="activate-device-mac-input"
             InputProps={{ sx: { borderRadius: 3 } }}
           />
         </DialogContent>
@@ -382,6 +486,7 @@ export const UsersPage = () => {
               setActivateDialogOpen(false);
               setSelectedUser(null);
               setDeviceNumber('');
+              setDeviceMacAddress('');
             }}
             disabled={activating}
             data-testid="activate-cancel-button"
@@ -392,7 +497,7 @@ export const UsersPage = () => {
           <Button
             variant="contained"
             onClick={handleActivateUser}
-            disabled={activating || !deviceNumber.trim()}
+            disabled={activating || !deviceNumber.trim() || !deviceMacAddress.trim()}
             data-testid="activate-submit-button"
             sx={{
               borderRadius: 3,
