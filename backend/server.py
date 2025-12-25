@@ -101,10 +101,12 @@ class User(BaseModel):
     name: str
     phone: str
     device_number: str = ""
+    device_mac_address: str = ""
     last_run_location: str = ""
     password: str
     secret_code: str
     status: str = "Inactive"
+    token_version: int = 1
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # Helper functions for JWT
@@ -117,12 +119,13 @@ def create_jwt_token(email: str) -> str:
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
-def create_user_jwt_token(user_id: int, phone: str) -> str:
+def create_user_jwt_token(user_id: int, phone: str, token_version: int = 1) -> str:
     expiration = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
     payload = {
         "sub": str(user_id),
         "phone": phone,
         "type": "user",
+        "token_version": token_version,
         "exp": expiration,
         "iat": datetime.now(timezone.utc)
     }
@@ -172,7 +175,7 @@ async def user_login(request: UserLoginRequest):
         return error_response("Account is inactive. Please contact admin.", 403)
     
     # Generate JWT token
-    token = create_user_jwt_token(user["user_id"], user["phone"])
+    token = create_user_jwt_token(user["user_id"], user["phone"], user.get("token_version", 1))
     
     return success_response({
         "token": token,
@@ -180,6 +183,7 @@ async def user_login(request: UserLoginRequest):
         "name": user["name"],
         "phone": user["phone"],
         "device_id": user.get("device_number") if user.get("device_number") else None,
+        "device_mac_address": user.get("device_mac_address") if user.get("device_mac_address") else None,
         "status": user["status"],
         "message": "Login successful"
     })
@@ -217,10 +221,12 @@ async def signup_user(request: UserSignupRequest):
         name=request.name,
         phone=request.phone,
         device_number="",
+        device_mac_address="",
         last_run_location="",
         password=password,
         secret_code=secret_code,
-        status="Inactive"
+        status="Inactive",
+        token_version=1
     )
     
     doc = user.model_dump()
@@ -251,6 +257,7 @@ async def get_users(email: str = Depends(verify_jwt_token)):
             "name": user["name"],
             "phone": user["phone"],
             "device_number": user.get("device_number", ""),
+            "device_mac_address": user.get("device_mac_address", ""),
             "last_run_location": user.get("last_run_location", ""),
             "password": user["password"],
             "secret_code": user["secret_code"],
@@ -274,17 +281,21 @@ async def delete_user(user_id: int, email: str = Depends(verify_jwt_token)):
     })
 
 @api_router.patch("/users/{user_id}/status")
-async def update_user_status(user_id: int, status: str, device_number: str = None, email: str = Depends(verify_jwt_token)):
+async def update_user_status(user_id: int, status: str, device_number: str = None, device_mac_address: str = None, email: str = Depends(verify_jwt_token)):
     if status not in ["Active", "Inactive"]:
         return error_response("Status must be 'Active' or 'Inactive'", 400)
     
-    # Device number is required when activating
-    if status == "Active" and not device_number:
-        return error_response("Device number is required when activating a user", 400)
+    # Device number and MAC address are required when activating
+    if status == "Active":
+        if not device_number:
+            return error_response("Device number is required when activating a user", 400)
+        if not device_mac_address:
+            return error_response("Device MAC address is required when activating a user", 400)
     
     update_data = {"status": status}
-    if status == "Active" and device_number:
+    if status == "Active":
         update_data["device_number"] = device_number
+        update_data["device_mac_address"] = device_mac_address
     
     result = await db.users.update_one(
         {"user_id": user_id},
@@ -297,13 +308,58 @@ async def update_user_status(user_id: int, status: str, device_number: str = Non
     return success_response({
         "message": f"User status updated to {status}",
         "user_id": user_id,
-        "device_number": device_number if status == "Active" else None
+        "device_number": device_number if status == "Active" else None,
+        "device_mac_address": device_mac_address if status == "Active" else None
     })
 
 @api_router.get("/users/count")
 async def get_users_count(email: str = Depends(verify_jwt_token)):
     count = await db.users.count_documents({})
     return success_response({"count": count})
+
+# Reset Password (Protected)
+@api_router.patch("/users/{user_id}/reset-password")
+async def reset_password(user_id: int, email: str = Depends(verify_jwt_token)):
+    # Generate new password
+    new_password = generate_password(6)
+    
+    # Increment token_version to invalidate existing tokens
+    result = await db.users.update_one(
+        {"user_id": user_id},
+        {
+            "$set": {"password": new_password},
+            "$inc": {"token_version": 1}
+        }
+    )
+    
+    if result.matched_count == 0:
+        return error_response("User not found", 404)
+    
+    return success_response({
+        "message": "Password reset successfully. User's existing sessions have been invalidated.",
+        "user_id": user_id,
+        "new_password": new_password
+    })
+
+# Reset Secret Code (Protected)
+@api_router.patch("/users/{user_id}/reset-secret-code")
+async def reset_secret_code(user_id: int, email: str = Depends(verify_jwt_token)):
+    # Generate new secret code
+    new_secret_code = generate_secret_code(5)
+    
+    result = await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {"secret_code": new_secret_code}}
+    )
+    
+    if result.matched_count == 0:
+        return error_response("User not found", 404)
+    
+    return success_response({
+        "message": "Secret code reset successfully.",
+        "user_id": user_id,
+        "new_secret_code": new_secret_code
+    })
 
 # Health check
 @api_router.get("/")
