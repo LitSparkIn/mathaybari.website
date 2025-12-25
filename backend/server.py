@@ -90,6 +90,7 @@ class LoginRequest(BaseModel):
 class UserLoginRequest(BaseModel):
     phone: str
     password: str
+    device_id: str
 
 class UserSignupRequest(BaseModel):
     name: str
@@ -166,9 +167,12 @@ async def user_login(request: UserLoginRequest):
     user = await db.users.find_one({"phone": request.phone}, {"_id": 0})
     
     if not user:
-        return error_response("User not found", 404)
+        return error_response("Invalid credentials", 401)
     
     if user["password"] != request.password:
+        return error_response("Invalid credentials", 401)
+    
+    if user.get("device_number") != request.device_id:
         return error_response("Invalid credentials", 401)
     
     if user["status"] != "Active":
