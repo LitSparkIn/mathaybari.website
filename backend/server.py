@@ -183,7 +183,7 @@ async def user_login(request: UserLoginRequest):
         "name": user["name"],
         "phone": user["phone"],
         "device_id": user.get("device_number") if user.get("device_number") else None,
-        "device_mac_address": user.get("device_mac_address") if user.get("device_mac_address") else None,
+        "mac_id": user.get("device_mac_address") if user.get("device_mac_address") else None,
         "status": user["status"],
         "message": "Login successful"
     })
