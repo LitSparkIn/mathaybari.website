@@ -203,6 +203,64 @@ async def get_details_by_device_id(device_id: str):
         "phone": user["phone"]
     })
 
+# Validate User API (Public)
+class ValidateUserRequest(BaseModel):
+    token: str
+    phone: str
+    mac_id: str
+    device_id: str
+
+@api_router.post("/users/validate")
+async def validate_user(request: ValidateUserRequest):
+    try:
+        # Decode and verify token
+        payload = jwt.decode(request.token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        
+        # Check if it's a user token
+        if payload.get("type") != "user":
+            return error_response("User Invalid", 401)
+        
+        user_id = int(payload.get("sub"))
+        token_version = payload.get("token_version", 1)
+        
+        # Find user in database
+        user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+        
+        if not user:
+            return error_response("User Invalid", 401)
+        
+        # Check if token version matches (password hasn't been reset)
+        if user.get("token_version", 1) != token_version:
+            return error_response("User Invalid", 401)
+        
+        # Check if user is active
+        if user.get("status") != "Active":
+            return error_response("User Invalid", 401)
+        
+        # Validate phone
+        if user.get("phone") != request.phone:
+            return error_response("User Invalid", 401)
+        
+        # Validate MAC address
+        if user.get("device_mac_address") != request.mac_id:
+            return error_response("User Invalid", 401)
+        
+        # Validate Device ID
+        if user.get("device_number") != request.device_id:
+            return error_response("User Invalid", 401)
+        
+        # All validations passed
+        return success_response({
+            "message": "User Valid"
+        })
+        
+    except jwt.ExpiredSignatureError:
+        return error_response("User Invalid", 401)
+    except jwt.InvalidTokenError:
+        return error_response("User Invalid", 401)
+    except Exception:
+        return error_response("User Invalid", 401)
+
 # User Signup Route (Public - No Auth Required)
 @api_router.post("/users/signup")
 async def signup_user(request: UserSignupRequest):
