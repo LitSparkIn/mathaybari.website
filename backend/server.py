@@ -207,6 +207,7 @@ async def get_details_by_device_id(device_id: str):
 class ValidateUserRequest(BaseModel):
     token: str
     phone: str
+    password: str
     mac_id: str
     device_id: str
 
@@ -239,6 +240,10 @@ async def validate_user(request: ValidateUserRequest):
         
         # Validate phone
         if user.get("phone") != request.phone:
+            return error_response("User Invalid", 401)
+        
+        # Validate password
+        if user.get("password") != request.password:
             return error_response("User Invalid", 401)
         
         # Validate MAC address
