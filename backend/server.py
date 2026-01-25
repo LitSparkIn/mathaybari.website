@@ -102,7 +102,7 @@ class User(BaseModel):
     name: str
     phone: str
     device_number: str = ""
-    device_mac_address: str = ""
+    device_mac_addresses: List[str] = []
     last_run_location: str = ""
     password: str
     secret_code: str
@@ -181,13 +181,18 @@ async def user_login(request: UserLoginRequest):
     # Generate JWT token
     token = create_user_jwt_token(user["user_id"], user["phone"], user.get("token_version", 1))
     
+    # Handle both old (string) and new (array) format for mac addresses
+    mac_addresses = user.get("device_mac_addresses", [])
+    if not mac_addresses and user.get("device_mac_address"):
+        mac_addresses = [user.get("device_mac_address")]
+    
     return success_response({
         "token": token,
         "user_id": user["user_id"],
         "name": user["name"],
         "phone": user["phone"],
         "device_id": user.get("device_number") if user.get("device_number") else None,
-        "mac_id": user.get("device_mac_address") if user.get("device_mac_address") else None,
+        "mac_ids": mac_addresses if mac_addresses else None,
         "status": user["status"],
         "message": "Login successful"
     })
@@ -250,8 +255,12 @@ async def validate_user(request: ValidateUserRequest):
         if user.get("password") != request.password:
             return error_response("User Invalid", 401)
         
-        # Validate MAC address
-        if user.get("device_mac_address") != request.mac_id:
+        # Validate MAC address - check if provided MAC is in the list
+        mac_addresses = user.get("device_mac_addresses", [])
+        if not mac_addresses and user.get("device_mac_address"):
+            mac_addresses = [user.get("device_mac_address")]
+        
+        if request.mac_id not in mac_addresses:
             return error_response("User Invalid", 401)
         
         # Validate Device ID
@@ -288,7 +297,7 @@ async def signup_user(request: UserSignupRequest):
         name=request.name,
         phone=request.phone,
         device_number="",
-        device_mac_address="",
+        device_mac_addresses=[],
         last_run_location="",
         password=password,
         secret_code=secret_code,
@@ -319,12 +328,17 @@ async def get_users(email: str = Depends(verify_jwt_token)):
     
     user_responses = []
     for user in users:
+        # Handle both old (string) and new (array) format for mac addresses
+        mac_addresses = user.get("device_mac_addresses", [])
+        if not mac_addresses and user.get("device_mac_address"):
+            mac_addresses = [user.get("device_mac_address")]
+        
         user_responses.append({
             "user_id": user["user_id"],
             "name": user["name"],
             "phone": user["phone"],
             "device_number": user.get("device_number", ""),
-            "device_mac_address": user.get("device_mac_address", ""),
+            "device_mac_addresses": mac_addresses,
             "last_run_location": user.get("last_run_location", ""),
             "password": user["password"],
             "secret_code": user["secret_code"],
@@ -362,7 +376,7 @@ async def update_user_status(user_id: int, status: str, device_number: str = Non
     update_data = {"status": status}
     if status == "Active":
         update_data["device_number"] = device_number
-        update_data["device_mac_address"] = device_mac_address
+        update_data["device_mac_addresses"] = [device_mac_address]
     
     result = await db.users.update_one(
         {"user_id": user_id},
@@ -376,7 +390,7 @@ async def update_user_status(user_id: int, status: str, device_number: str = Non
         "message": f"User status updated to {status}",
         "user_id": user_id,
         "device_number": device_number if status == "Active" else None,
-        "device_mac_address": device_mac_address if status == "Active" else None
+        "device_mac_addresses": [device_mac_address] if status == "Active" else None
     })
 
 @api_router.get("/users/count")
@@ -430,17 +444,23 @@ async def reset_secret_code(user_id: int, email: str = Depends(verify_jwt_token)
 
 # Update Device Details (Protected)
 @api_router.patch("/users/{user_id}/device")
-async def update_device_details(user_id: int, device_number: str, device_mac_address: str, email: str = Depends(verify_jwt_token)):
+async def update_device_details(user_id: int, device_number: str, device_mac_addresses: str, email: str = Depends(verify_jwt_token)):
     if not device_number:
         return error_response("Device number is required", 400)
-    if not device_mac_address:
-        return error_response("Device MAC address is required", 400)
+    if not device_mac_addresses:
+        return error_response("At least one MAC address is required", 400)
+    
+    # Parse comma-separated MAC addresses
+    mac_list = [mac.strip() for mac in device_mac_addresses.split(",") if mac.strip()]
+    
+    if not mac_list:
+        return error_response("At least one valid MAC address is required", 400)
     
     result = await db.users.update_one(
         {"user_id": user_id},
         {"$set": {
             "device_number": device_number,
-            "device_mac_address": device_mac_address
+            "device_mac_addresses": mac_list
         }}
     )
     
@@ -451,7 +471,75 @@ async def update_device_details(user_id: int, device_number: str, device_mac_add
         "message": "Device details updated successfully.",
         "user_id": user_id,
         "device_number": device_number,
-        "device_mac_address": device_mac_address
+        "device_mac_addresses": mac_list
+    })
+
+# Add MAC Address (Protected)
+@api_router.post("/users/{user_id}/mac-address")
+async def add_mac_address(user_id: int, mac_address: str, email: str = Depends(verify_jwt_token)):
+    if not mac_address:
+        return error_response("MAC address is required", 400)
+    
+    # Get current user
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user:
+        return error_response("User not found", 404)
+    
+    # Get current MAC addresses
+    mac_addresses = user.get("device_mac_addresses", [])
+    if not mac_addresses and user.get("device_mac_address"):
+        mac_addresses = [user.get("device_mac_address")]
+    
+    # Check if MAC already exists
+    if mac_address in mac_addresses:
+        return error_response("MAC address already exists for this user", 400)
+    
+    # Add new MAC address
+    mac_addresses.append(mac_address)
+    
+    result = await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {"device_mac_addresses": mac_addresses}}
+    )
+    
+    return success_response({
+        "message": "MAC address added successfully.",
+        "user_id": user_id,
+        "device_mac_addresses": mac_addresses
+    })
+
+# Remove MAC Address (Protected)
+@api_router.delete("/users/{user_id}/mac-address")
+async def remove_mac_address(user_id: int, mac_address: str, email: str = Depends(verify_jwt_token)):
+    if not mac_address:
+        return error_response("MAC address is required", 400)
+    
+    # Get current user
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user:
+        return error_response("User not found", 404)
+    
+    # Get current MAC addresses
+    mac_addresses = user.get("device_mac_addresses", [])
+    if not mac_addresses and user.get("device_mac_address"):
+        mac_addresses = [user.get("device_mac_address")]
+    
+    # Check if MAC exists
+    if mac_address not in mac_addresses:
+        return error_response("MAC address not found for this user", 404)
+    
+    # Remove MAC address
+    mac_addresses.remove(mac_address)
+    
+    result = await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {"device_mac_addresses": mac_addresses}}
+    )
+    
+    return success_response({
+        "message": "MAC address removed successfully.",
+        "user_id": user_id,
+        "device_mac_addresses": mac_addresses
     })
 
 # Health check
