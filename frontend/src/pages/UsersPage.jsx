@@ -59,6 +59,7 @@ export const UsersPage = () => {
   const [addMacDialogOpen, setAddMacDialogOpen] = useState(false);
   const [addMacAddress, setAddMacAddress] = useState('');
   const [addingMac, setAddingMac] = useState(false);
+  const [deletingMac, setDeletingMac] = useState(null);
 
   useEffect(() => {
     fetchUsers();
@@ -268,6 +269,32 @@ export const UsersPage = () => {
     }
   };
 
+  const handleDeleteMacAddress = async (userId, macAddress) => {
+    if (!window.confirm(`Delete MAC address ${macAddress}?`)) {
+      return;
+    }
+
+    setDeletingMac(`${userId}-${macAddress}`);
+    
+    try {
+      const response = await axios.delete(
+        `${API}/users/${userId}/mac-address?mac_address=${encodeURIComponent(macAddress)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (response.data.status === 'success') {
+        toast.success('MAC address deleted successfully');
+        fetchUsers();
+      } else {
+        toast.error(response.data.data.message || 'Failed to delete MAC address');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.data?.message || 'Failed to delete MAC address');
+    } finally {
+      setDeletingMac(null);
+    }
+  };
+
   const handleResetPassword = async (userId, userName) => {
     if (!window.confirm(`Reset password for ${userName}? This will invalidate their current session.`)) {
       return;
@@ -423,10 +450,22 @@ export const UsersPage = () => {
                             key={idx}
                             label={mac}
                             size="small"
+                            onDelete={() => handleDeleteMacAddress(user.user_id, mac)}
+                            deleteIcon={
+                              deletingMac === `${user.user_id}-${mac}` ? (
+                                <CircularProgress size={14} />
+                              ) : (
+                                <Close sx={{ fontSize: 14 }} />
+                              )
+                            }
+                            disabled={deletingMac === `${user.user_id}-${mac}`}
                             sx={{
                               fontFamily: 'monospace',
                               fontSize: '0.7rem',
-                              height: 22,
+                              height: 24,
+                              '& .MuiChip-deleteIcon': {
+                                fontSize: 14,
+                              },
                             }}
                           />
                         ))}
