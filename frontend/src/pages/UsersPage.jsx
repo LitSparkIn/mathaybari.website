@@ -22,8 +22,12 @@ import {
   CircularProgress,
   Chip,
   Tooltip,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
 } from '@mui/material';
-import { Delete, People, CheckCircle, Cancel, Key, VpnKey, Edit } from '@mui/icons-material';
+import { Delete, People, CheckCircle, Cancel, Key, VpnKey, Edit, Add, Close } from '@mui/icons-material';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -47,8 +51,14 @@ export const UsersPage = () => {
   // Edit device modal state
   const [editDeviceDialogOpen, setEditDeviceDialogOpen] = useState(false);
   const [editDeviceNumber, setEditDeviceNumber] = useState('');
-  const [editDeviceMacAddress, setEditDeviceMacAddress] = useState('');
+  const [editMacAddresses, setEditMacAddresses] = useState([]);
+  const [newMacAddress, setNewMacAddress] = useState('');
   const [editingDevice, setEditingDevice] = useState(false);
+
+  // Add MAC modal state
+  const [addMacDialogOpen, setAddMacDialogOpen] = useState(false);
+  const [addMacAddress, setAddMacAddress] = useState('');
+  const [addingMac, setAddingMac] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -95,7 +105,7 @@ export const UsersPage = () => {
     } else {
       setSelectedUser(user);
       setDeviceNumber(user.device_number || '');
-      setDeviceMacAddress(user.device_mac_address || '');
+      setDeviceMacAddress('');
       setActivateDialogOpen(true);
     }
   };
@@ -164,8 +174,23 @@ export const UsersPage = () => {
   const handleEditDevice = (user) => {
     setSelectedUser(user);
     setEditDeviceNumber(user.device_number || '');
-    setEditDeviceMacAddress(user.device_mac_address || '');
+    setEditMacAddresses(user.device_mac_addresses || []);
+    setNewMacAddress('');
     setEditDeviceDialogOpen(true);
+  };
+
+  const handleAddMacToList = () => {
+    if (!newMacAddress.trim()) return;
+    if (editMacAddresses.includes(newMacAddress.trim())) {
+      toast.error('MAC address already exists');
+      return;
+    }
+    setEditMacAddresses([...editMacAddresses, newMacAddress.trim()]);
+    setNewMacAddress('');
+  };
+
+  const handleRemoveMacFromList = (mac) => {
+    setEditMacAddresses(editMacAddresses.filter(m => m !== mac));
   };
 
   const handleSaveDevice = async () => {
@@ -173,15 +198,15 @@ export const UsersPage = () => {
       toast.error('Device number is required');
       return;
     }
-    if (!editDeviceMacAddress.trim()) {
-      toast.error('Device MAC address is required');
+    if (editMacAddresses.length === 0) {
+      toast.error('At least one MAC address is required');
       return;
     }
 
     setEditingDevice(true);
     
     try {
-      const url = `${API}/users/${selectedUser.user_id}/device?device_number=${encodeURIComponent(editDeviceNumber)}&device_mac_address=${encodeURIComponent(editDeviceMacAddress)}`;
+      const url = `${API}/users/${selectedUser.user_id}/device?device_number=${encodeURIComponent(editDeviceNumber)}&device_mac_addresses=${encodeURIComponent(editMacAddresses.join(','))}`;
       
       const response = await axios.patch(
         url,
@@ -194,7 +219,7 @@ export const UsersPage = () => {
         setEditDeviceDialogOpen(false);
         setSelectedUser(null);
         setEditDeviceNumber('');
-        setEditDeviceMacAddress('');
+        setEditMacAddresses([]);
         fetchUsers();
       } else {
         toast.error(response.data.data.message || 'Failed to update device details');
@@ -203,6 +228,43 @@ export const UsersPage = () => {
       toast.error(error.response?.data?.data?.message || 'Failed to update device details');
     } finally {
       setEditingDevice(false);
+    }
+  };
+
+  const handleOpenAddMac = (user) => {
+    setSelectedUser(user);
+    setAddMacAddress('');
+    setAddMacDialogOpen(true);
+  };
+
+  const handleAddMacAddress = async () => {
+    if (!addMacAddress.trim()) {
+      toast.error('MAC address is required');
+      return;
+    }
+
+    setAddingMac(true);
+    
+    try {
+      const response = await axios.post(
+        `${API}/users/${selectedUser.user_id}/mac-address?mac_address=${encodeURIComponent(addMacAddress)}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (response.data.status === 'success') {
+        toast.success('MAC address added successfully');
+        setAddMacDialogOpen(false);
+        setSelectedUser(null);
+        setAddMacAddress('');
+        fetchUsers();
+      } else {
+        toast.error(response.data.data.message || 'Failed to add MAC address');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.data?.message || 'Failed to add MAC address');
+    } finally {
+      setAddingMac(false);
     }
   };
 
@@ -332,12 +394,12 @@ export const UsersPage = () => {
                 <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Phone</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Device Number</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>MAC Address</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>MAC Addresses</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Last Run Location</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Password</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Secret Code</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 600, width: 200 }}>Actions</TableCell>
+                <TableCell sx={{ fontWeight: 600, width: 220 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -353,8 +415,25 @@ export const UsersPage = () => {
                   <TableCell sx={{ color: user.device_number ? 'text.primary' : 'text.disabled' }}>
                     {user.device_number || '—'}
                   </TableCell>
-                  <TableCell sx={{ color: user.device_mac_address ? 'text.primary' : 'text.disabled', fontFamily: 'monospace', fontSize: '0.75rem' }}>
-                    {user.device_mac_address || '—'}
+                  <TableCell>
+                    {user.device_mac_addresses && user.device_mac_addresses.length > 0 ? (
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {user.device_mac_addresses.map((mac, idx) => (
+                          <Chip
+                            key={idx}
+                            label={mac}
+                            size="small"
+                            sx={{
+                              fontFamily: 'monospace',
+                              fontSize: '0.7rem',
+                              height: 22,
+                            }}
+                          />
+                        ))}
+                      </Box>
+                    ) : (
+                      <Typography color="text.disabled">—</Typography>
+                    )}
                   </TableCell>
                   <TableCell sx={{ color: user.last_run_location ? 'text.primary' : 'text.disabled' }}>
                     {user.last_run_location || '—'}
@@ -416,6 +495,19 @@ export const UsersPage = () => {
                           }}
                         >
                           <Edit fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Add MAC Address">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleOpenAddMac(user)}
+                          data-testid={`add-mac-${user.user_id}`}
+                          sx={{
+                            color: '#00bcd4',
+                            '&:hover': { bgcolor: 'rgba(0, 188, 212, 0.1)' },
+                          }}
+                        >
+                          <Add fontSize="small" />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Reset Password">
@@ -504,7 +596,6 @@ export const UsersPage = () => {
         }}
         maxWidth="sm"
         fullWidth
-        data-testid="activate-user-dialog"
         PaperProps={{ sx: { borderRadius: 4 } }}
       >
         <DialogTitle sx={{ fontWeight: 600 }}>Activate User</DialogTitle>
@@ -521,7 +612,6 @@ export const UsersPage = () => {
             placeholder="Enter device number"
             disabled={activating}
             required
-            data-testid="activate-device-number-input"
             sx={{ mb: 3 }}
             InputProps={{ sx: { borderRadius: 3 } }}
           />
@@ -534,7 +624,6 @@ export const UsersPage = () => {
             placeholder="e.g., AA:BB:CC:DD:EE:FF"
             disabled={activating}
             required
-            data-testid="activate-device-mac-input"
             InputProps={{ sx: { borderRadius: 3 } }}
           />
         </DialogContent>
@@ -575,11 +664,10 @@ export const UsersPage = () => {
           setEditDeviceDialogOpen(false);
           setSelectedUser(null);
           setEditDeviceNumber('');
-          setEditDeviceMacAddress('');
+          setEditMacAddresses([]);
         }}
         maxWidth="sm"
         fullWidth
-        data-testid="edit-device-dialog"
         PaperProps={{ sx: { borderRadius: 4 } }}
       >
         <DialogTitle sx={{ fontWeight: 600 }}>Edit Device Details</DialogTitle>
@@ -596,30 +684,64 @@ export const UsersPage = () => {
             placeholder="Enter device number"
             disabled={editingDevice}
             required
-            data-testid="edit-device-number-input"
             sx={{ mb: 3 }}
             InputProps={{ sx: { borderRadius: 3 } }}
           />
 
-          <TextField
-            fullWidth
-            label="Device MAC Address"
-            value={editDeviceMacAddress}
-            onChange={(e) => setEditDeviceMacAddress(e.target.value)}
-            placeholder="e.g., AA:BB:CC:DD:EE:FF"
-            disabled={editingDevice}
-            required
-            data-testid="edit-device-mac-input"
-            InputProps={{ sx: { borderRadius: 3 } }}
-          />
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>MAC Addresses</Typography>
+          
+          {editMacAddresses.length > 0 && (
+            <List dense sx={{ mb: 2, bgcolor: 'rgba(0,0,0,0.02)', borderRadius: 2 }}>
+              {editMacAddresses.map((mac, idx) => (
+                <ListItem key={idx}>
+                  <ListItemText 
+                    primary={mac} 
+                    primaryTypographyProps={{ fontFamily: 'monospace', fontSize: '0.875rem' }}
+                  />
+                  <ListItemSecondaryAction>
+                    <IconButton 
+                      edge="end" 
+                      size="small" 
+                      onClick={() => handleRemoveMacFromList(mac)}
+                      disabled={editingDevice}
+                    >
+                      <Close fontSize="small" />
+                    </IconButton>
+                  </ListItemSecondaryAction>
+                </ListItem>
+              ))}
+            </List>
+          )}
+
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <TextField
+              fullWidth
+              label="Add MAC Address"
+              value={newMacAddress}
+              onChange={(e) => setNewMacAddress(e.target.value)}
+              placeholder="e.g., AA:BB:CC:DD:EE:FF"
+              disabled={editingDevice}
+              size="small"
+              InputProps={{ sx: { borderRadius: 3 } }}
+              onKeyPress={(e) => e.key === 'Enter' && handleAddMacToList()}
+            />
+            <Button
+              variant="outlined"
+              onClick={handleAddMacToList}
+              disabled={editingDevice || !newMacAddress.trim()}
+              sx={{ borderRadius: 3, minWidth: 80 }}
+            >
+              Add
+            </Button>
+          </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 3, pt: 0 }}>
+        <DialogActions sx={{ p: 3, pt: 2 }}>
           <Button
             onClick={() => {
               setEditDeviceDialogOpen(false);
               setSelectedUser(null);
               setEditDeviceNumber('');
-              setEditDeviceMacAddress('');
+              setEditMacAddresses([]);
             }}
             disabled={editingDevice}
             sx={{ borderRadius: 3 }}
@@ -629,7 +751,7 @@ export const UsersPage = () => {
           <Button
             variant="contained"
             onClick={handleSaveDevice}
-            disabled={editingDevice || !editDeviceNumber.trim() || !editDeviceMacAddress.trim()}
+            disabled={editingDevice || !editDeviceNumber.trim() || editMacAddresses.length === 0}
             sx={{
               borderRadius: 3,
               bgcolor: '#9c27b0',
@@ -639,6 +761,80 @@ export const UsersPage = () => {
             }}
           >
             {editingDevice ? <CircularProgress size={24} color="inherit" /> : 'Save Changes'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Add MAC Address Dialog */}
+      <Dialog
+        open={addMacDialogOpen}
+        onClose={() => {
+          setAddMacDialogOpen(false);
+          setSelectedUser(null);
+          setAddMacAddress('');
+        }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 4 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 600 }}>Add MAC Address</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Add a new MAC address for <strong>{selectedUser?.name}</strong>.
+          </Typography>
+          
+          {selectedUser?.device_mac_addresses?.length > 0 && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>Current MAC Addresses:</Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {selectedUser.device_mac_addresses.map((mac, idx) => (
+                  <Chip
+                    key={idx}
+                    label={mac}
+                    size="small"
+                    sx={{ fontFamily: 'monospace' }}
+                  />
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          <TextField
+            fullWidth
+            label="New MAC Address"
+            value={addMacAddress}
+            onChange={(e) => setAddMacAddress(e.target.value)}
+            placeholder="e.g., AA:BB:CC:DD:EE:FF"
+            disabled={addingMac}
+            required
+            InputProps={{ sx: { borderRadius: 3 } }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button
+            onClick={() => {
+              setAddMacDialogOpen(false);
+              setSelectedUser(null);
+              setAddMacAddress('');
+            }}
+            disabled={addingMac}
+            sx={{ borderRadius: 3 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleAddMacAddress}
+            disabled={addingMac || !addMacAddress.trim()}
+            sx={{
+              borderRadius: 3,
+              bgcolor: '#00bcd4',
+              color: '#fff',
+              fontWeight: 600,
+              '&:hover': { bgcolor: '#00acc1' },
+            }}
+          >
+            {addingMac ? <CircularProgress size={24} color="inherit" /> : 'Add MAC Address'}
           </Button>
         </DialogActions>
       </Dialog>
