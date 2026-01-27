@@ -127,8 +127,8 @@ export const UsersPage = () => {
       toast.error('Device ID is required');
       return;
     }
-    if (deviceId.length !== 8 || !/^\d+$/.test(deviceId)) {
-      toast.error('Device ID must be an 8-digit number');
+    if (deviceId.length !== 8) {
+      toast.error('Device ID must be 8 characters');
       return;
     }
 
@@ -170,8 +170,8 @@ export const UsersPage = () => {
       toast.error('Device ID is required');
       return;
     }
-    if (addDeviceId.length !== 8 || !/^\d+$/.test(addDeviceId)) {
-      toast.error('Device ID must be an 8-digit number');
+    if (addDeviceId.length !== 8) {
+      toast.error('Device ID must be 8 characters');
       return;
     }
 
@@ -515,7 +515,7 @@ export const UsersPage = () => {
         <DialogTitle sx={{ fontWeight: 600 }}>Activate User</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Enter an 8-digit Device ID to activate <strong>{selectedUser?.name}</strong>.
+            Enter an 8-character Device ID to activate <strong>{selectedUser?.name}</strong>.
           </Typography>
           
           <TextField
@@ -523,13 +523,13 @@ export const UsersPage = () => {
             label="Device ID"
             value={deviceId}
             onChange={(e) => {
-              const val = e.target.value.replace(/\D/g, '').slice(0, 8);
+              const val = e.target.value.toUpperCase().slice(0, 8);
               setDeviceId(val);
             }}
-            placeholder="Enter 8-digit Device ID"
+            placeholder="Enter 8-character Device ID"
             disabled={activating}
             required
-            helperText={`${deviceId.length}/8 digits`}
+            helperText={`${deviceId.length}/8 characters`}
             InputProps={{ sx: { borderRadius: 3 } }}
           />
         </DialogContent>
@@ -577,7 +577,7 @@ export const UsersPage = () => {
         <DialogTitle sx={{ fontWeight: 600 }}>Add Device ID</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Add an 8-digit Device ID for <strong>{selectedUser?.name}</strong>.
+            Add an 8-character Device ID for <strong>{selectedUser?.name}</strong>.
           </Typography>
           
           {selectedUser?.device_ids?.length > 0 && (
@@ -601,13 +601,13 @@ export const UsersPage = () => {
             label="New Device ID"
             value={addDeviceId}
             onChange={(e) => {
-              const val = e.target.value.replace(/\D/g, '').slice(0, 8);
+              const val = e.target.value.toUpperCase().slice(0, 8);
               setAddDeviceId(val);
             }}
-            placeholder="Enter 8-digit Device ID"
+            placeholder="Enter 8-character Device ID"
             disabled={addingDevice}
             required
-            helperText={`${addDeviceId.length}/8 digits`}
+            helperText={`${addDeviceId.length}/8 characters`}
             InputProps={{ sx: { borderRadius: 3 } }}
           />
         </DialogContent>

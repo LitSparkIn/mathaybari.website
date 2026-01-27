@@ -68,8 +68,9 @@ def generate_secret_code(length=5):
     return ''.join(random.choice(string.digits) for _ in range(length))
 
 def generate_device_id(length=8):
-    """Generate an 8 digit numeric device ID"""
-    return ''.join(random.choice(string.digits) for _ in range(length))
+    """Generate an 8 character alphanumeric device ID"""
+    characters = string.ascii_uppercase + string.digits
+    return ''.join(random.choice(characters) for _ in range(length))
 
 async def get_next_user_id():
     """Get next auto-increment 4 digit user ID"""
@@ -371,8 +372,8 @@ async def update_user_status(user_id: int, status: str, device_id: str = None, e
     if status == "Active":
         if not device_id:
             return error_response("Device ID is required when activating a user", 400)
-        if len(device_id) != 8 or not device_id.isdigit():
-            return error_response("Device ID must be an 8-digit number", 400)
+        if len(device_id) != 8:
+            return error_response("Device ID must be 8 characters", 400)
     
     update_data = {"status": status}
     if status == "Active":
@@ -447,8 +448,8 @@ async def add_device_id(user_id: int, device_id: str, email: str = Depends(verif
     if not device_id:
         return error_response("Device ID is required", 400)
     
-    if len(device_id) != 8 or not device_id.isdigit():
-        return error_response("Device ID must be an 8-digit number", 400)
+    if len(device_id) != 8:
+        return error_response("Device ID must be 8 characters", 400)
     
     # Get current user
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
