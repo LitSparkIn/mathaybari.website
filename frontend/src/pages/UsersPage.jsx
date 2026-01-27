@@ -215,7 +215,16 @@ export const UsersPage = () => {
       
       if (response.data.status === 'success') {
         toast.success('Device ID deleted successfully');
-        fetchUsers();
+        // Update local state immediately for better UX
+        setUsers(prevUsers => prevUsers.map(user => {
+          if (user.user_id === userId) {
+            return {
+              ...user,
+              device_ids: user.device_ids.filter(id => id !== deviceIdToDelete)
+            };
+          }
+          return user;
+        }));
       } else {
         toast.error(response.data.data.message || 'Failed to delete Device ID');
       }
