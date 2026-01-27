@@ -200,9 +200,10 @@ async def user_login(request: UserLoginRequest):
     if user["password"] != request.password:
         return error_response("Invalid credentials", 401)
     
-    # Check if device_id is in the list of allowed device_ids
+    # Check if device_id is in the list of allowed device_ids (case-insensitive)
     device_ids = get_device_ids(user)
-    if request.device_id not in device_ids:
+    device_ids_lower = [d.lower() for d in device_ids]
+    if request.device_id.lower() not in device_ids_lower:
         return error_response("Invalid credentials", 401)
     
     if user["status"] != "Active":
@@ -260,9 +261,10 @@ async def validate_user(request: ValidateUserRequest):
         if user.get("password") != request.password:
             return error_response("User Invalid", 401)
         
-        # Validate Device ID
+        # Validate Device ID (case-insensitive)
         device_ids = get_device_ids(user)
-        if request.device_id not in device_ids:
+        device_ids_lower = [d.lower() for d in device_ids]
+        if request.device_id.lower() not in device_ids_lower:
             return error_response("User Invalid", 401)
         
         return success_response({
