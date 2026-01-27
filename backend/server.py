@@ -59,18 +59,13 @@ def error_response(message: str, code: int = 400):
 
 # Helper functions
 def generate_password(length=6):
-    """Generate a 6 digit alphanumeric password"""
+    """Generate a 6 character alphanumeric password"""
     characters = string.ascii_letters + string.digits
     return ''.join(random.choice(characters) for _ in range(length))
 
 def generate_secret_code(length=5):
     """Generate a 5 digit numeric secret code"""
     return ''.join(random.choice(string.digits) for _ in range(length))
-
-def generate_device_id(length=8):
-    """Generate an 8 character alphanumeric device ID"""
-    characters = string.ascii_uppercase + string.digits
-    return ''.join(random.choice(characters) for _ in range(length))
 
 async def get_next_user_id():
     """Get next auto-increment 4 digit user ID"""
@@ -88,7 +83,7 @@ async def get_next_user_id():
     return next_id
 
 # Models
-class LoginRequest(BaseModel):
+class AdminLoginRequest(BaseModel):
     email: str
     password: str
 
@@ -106,13 +101,20 @@ class User(BaseModel):
     user_id: int
     name: str
     phone: str
-    device_ids: List[str] = []
+    device_ids: List[str] = []      # Phone device IDs (alphanumeric)
+    ble_ids: List[str] = []          # BLE IDs (8 digits)
     last_run_location: str = ""
     password: str
     secret_code: str
     status: str = "Inactive"
     token_version: int = 1
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ValidateUserRequest(BaseModel):
+    token: str
+    phone: str
+    password: str
+    device_id: str
 
 # Helper functions for JWT
 def create_jwt_token(email: str) -> str:
@@ -145,9 +147,30 @@ def verify_jwt_token(credentials: HTTPAuthorizationCredentials = Depends(securit
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-# Auth Routes
+# Helper to get device_ids with backward compatibility
+def get_device_ids(user: dict) -> List[str]:
+    device_ids = user.get("device_ids", [])
+    # Backward compatibility with old field names
+    if not device_ids:
+        if user.get("device_number"):
+            device_ids = [user.get("device_number")]
+    return device_ids
+
+# Helper to get ble_ids with backward compatibility
+def get_ble_ids(user: dict) -> List[str]:
+    ble_ids = user.get("ble_ids", [])
+    # Backward compatibility with old field names
+    if not ble_ids:
+        if user.get("device_mac_addresses"):
+            ble_ids = user.get("device_mac_addresses")
+        elif user.get("device_mac_address"):
+            ble_ids = [user.get("device_mac_address")]
+    return ble_ids
+
+# ============ ADMIN AUTH ROUTES ============
+
 @api_router.post("/auth/login")
-async def login(request: LoginRequest):
+async def admin_login(request: AdminLoginRequest):
     if request.email == ADMIN_EMAIL and request.password == ADMIN_PASSWORD:
         token = create_jwt_token(request.email)
         return success_response({
@@ -158,13 +181,14 @@ async def login(request: LoginRequest):
     return error_response("Invalid credentials", 401)
 
 @api_router.get("/auth/verify")
-async def verify_token(email: str = Depends(verify_jwt_token)):
+async def verify_admin_token(email: str = Depends(verify_jwt_token)):
     return success_response({
         "valid": True,
         "email": email
     })
 
-# User Login Route (Public - No Auth Required)
+# ============ USER AUTH ROUTES ============
+
 @api_router.post("/users/login")
 async def user_login(request: UserLoginRequest):
     # Find user by phone
@@ -177,11 +201,7 @@ async def user_login(request: UserLoginRequest):
         return error_response("Invalid credentials", 401)
     
     # Check if device_id is in the list of allowed device_ids
-    device_ids = user.get("device_ids", [])
-    # Also check old field for backward compatibility
-    if not device_ids and user.get("device_number"):
-        device_ids = [user.get("device_number")]
-    
+    device_ids = get_device_ids(user)
     if request.device_id not in device_ids:
         return error_response("Invalid credentials", 401)
     
@@ -191,42 +211,19 @@ async def user_login(request: UserLoginRequest):
     # Generate JWT token
     token = create_user_jwt_token(user["user_id"], user["phone"], user.get("token_version", 1))
     
+    # Get BLE IDs
+    ble_ids = get_ble_ids(user)
+    
     return success_response({
         "token": token,
         "user_id": user["user_id"],
         "name": user["name"],
         "phone": user["phone"],
-        "device_ids": device_ids,
+        "device_id": request.device_id,
+        "ble_ids": ble_ids if ble_ids else None,
         "status": user["status"],
         "message": "Login successful"
     })
-
-# Get user details by device ID (Public - No Auth Required)
-@api_router.get("/users/get-details-by-device-id")
-async def get_details_by_device_id(device_id: str):
-    if not device_id:
-        return error_response("Device ID is required", 400)
-    
-    # Search in device_ids array
-    user = await db.users.find_one({"device_ids": device_id}, {"_id": 0})
-    
-    # Also check old field for backward compatibility
-    if not user:
-        user = await db.users.find_one({"device_number": device_id}, {"_id": 0})
-    
-    if not user:
-        return error_response("No user found with this device ID", 404)
-    
-    return success_response({
-        "phone": user["phone"]
-    })
-
-# Validate User API (Public)
-class ValidateUserRequest(BaseModel):
-    token: str
-    phone: str
-    password: str
-    device_id: str
 
 @api_router.post("/users/validate")
 async def validate_user(request: ValidateUserRequest):
@@ -247,7 +244,7 @@ async def validate_user(request: ValidateUserRequest):
         if not user:
             return error_response("User Invalid", 401)
         
-        # Check if token version matches (password hasn't been reset)
+        # Check if token version matches
         if user.get("token_version", 1) != token_version:
             return error_response("User Invalid", 401)
         
@@ -263,15 +260,11 @@ async def validate_user(request: ValidateUserRequest):
         if user.get("password") != request.password:
             return error_response("User Invalid", 401)
         
-        # Validate Device ID - check if provided device_id is in the list
-        device_ids = user.get("device_ids", [])
-        if not device_ids and user.get("device_number"):
-            device_ids = [user.get("device_number")]
-        
+        # Validate Device ID
+        device_ids = get_device_ids(user)
         if request.device_id not in device_ids:
             return error_response("User Invalid", 401)
         
-        # All validations passed
         return success_response({
             "message": "User Valid"
         })
@@ -283,7 +276,8 @@ async def validate_user(request: ValidateUserRequest):
     except Exception:
         return error_response("User Invalid", 401)
 
-# User Signup Route (Public - No Auth Required)
+# ============ USER SIGNUP ROUTE ============
+
 @api_router.post("/users/signup")
 async def signup_user(request: UserSignupRequest):
     # Check if phone already exists
@@ -301,6 +295,7 @@ async def signup_user(request: UserSignupRequest):
         name=request.name,
         phone=request.phone,
         device_ids=[],
+        ble_ids=[],
         last_run_location="",
         password=password,
         secret_code=secret_code,
@@ -323,7 +318,8 @@ async def signup_user(request: UserSignupRequest):
         "message": "User registered successfully"
     }, 201)
 
-# User Routes (Protected)
+# ============ USER MANAGEMENT ROUTES (PROTECTED) ============
+
 @api_router.get("/users")
 async def get_users(email: str = Depends(verify_jwt_token)):
     users_cursor = db.users.find({}, {"_id": 0}).sort("user_id", 1)
@@ -331,19 +327,18 @@ async def get_users(email: str = Depends(verify_jwt_token)):
     
     user_responses = []
     for user in users:
-        # Handle both old and new format for device IDs
-        device_ids = user.get("device_ids", [])
-        if not device_ids and user.get("device_number"):
-            device_ids = [user.get("device_number")]
+        device_ids = get_device_ids(user)
+        ble_ids = get_ble_ids(user)
         
         user_responses.append({
             "user_id": user["user_id"],
             "name": user["name"],
             "phone": user["phone"],
             "device_ids": device_ids,
+            "ble_ids": ble_ids,
             "last_run_location": user.get("last_run_location", ""),
             "password": user["password"],
-            "secret_code": user["secret_code"],
+            "secret_code": user.get("secret_code", ""),
             "status": user.get("status", "Inactive"),
             "created_at": user["created_at"] if isinstance(user["created_at"], str) else user["created_at"].isoformat()
         })
@@ -352,6 +347,11 @@ async def get_users(email: str = Depends(verify_jwt_token)):
         "users": user_responses,
         "total": len(user_responses)
     })
+
+@api_router.get("/users/count")
+async def get_users_count(email: str = Depends(verify_jwt_token)):
+    count = await db.users.count_documents({})
+    return success_response({"count": count})
 
 @api_router.delete("/users/{user_id}")
 async def delete_user(user_id: int, email: str = Depends(verify_jwt_token)):
@@ -362,6 +362,8 @@ async def delete_user(user_id: int, email: str = Depends(verify_jwt_token)):
         "message": "User deleted successfully",
         "user_id": user_id
     })
+
+# ============ USER STATUS ROUTES ============
 
 @api_router.patch("/users/{user_id}/status")
 async def update_user_status(user_id: int, status: str, device_id: str = None, email: str = Depends(verify_jwt_token)):
@@ -391,12 +393,139 @@ async def update_user_status(user_id: int, status: str, device_id: str = None, e
         "device_ids": [device_id] if status == "Active" else None
     })
 
-@api_router.get("/users/count")
-async def get_users_count(email: str = Depends(verify_jwt_token)):
-    count = await db.users.count_documents({})
-    return success_response({"count": count})
+# ============ DEVICE ID ROUTES ============
 
-# Reset Password (Protected)
+@api_router.post("/users/{user_id}/device-id")
+async def add_device_id(user_id: int, device_id: str, email: str = Depends(verify_jwt_token)):
+    if not device_id:
+        return error_response("Device ID is required", 400)
+    
+    # Get current user
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user:
+        return error_response("User not found", 404)
+    
+    # Get current device IDs
+    device_ids = get_device_ids(user)
+    
+    # Check if device ID already exists
+    if device_id in device_ids:
+        return error_response("Device ID already exists for this user", 400)
+    
+    # Add new device ID
+    device_ids.append(device_id)
+    
+    await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {"device_ids": device_ids}}
+    )
+    
+    return success_response({
+        "message": "Device ID added successfully.",
+        "user_id": user_id,
+        "device_ids": device_ids
+    })
+
+@api_router.delete("/users/{user_id}/device-id")
+async def remove_device_id(user_id: int, device_id: str, email: str = Depends(verify_jwt_token)):
+    if not device_id:
+        return error_response("Device ID is required", 400)
+    
+    # Get current user
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user:
+        return error_response("User not found", 404)
+    
+    # Get current device IDs
+    device_ids = get_device_ids(user)
+    
+    # Check if device ID exists
+    if device_id not in device_ids:
+        return error_response("Device ID not found for this user", 404)
+    
+    # Remove device ID
+    device_ids.remove(device_id)
+    
+    await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {"device_ids": device_ids}}
+    )
+    
+    return success_response({
+        "message": "Device ID removed successfully.",
+        "user_id": user_id,
+        "device_ids": device_ids
+    })
+
+# ============ BLE ID ROUTES ============
+
+@api_router.post("/users/{user_id}/ble-id")
+async def add_ble_id(user_id: int, ble_id: str, email: str = Depends(verify_jwt_token)):
+    if not ble_id:
+        return error_response("BLE ID is required", 400)
+    
+    if len(ble_id) != 8:
+        return error_response("BLE ID must be 8 characters", 400)
+    
+    # Get current user
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user:
+        return error_response("User not found", 404)
+    
+    # Get current BLE IDs
+    ble_ids = get_ble_ids(user)
+    
+    # Check if BLE ID already exists
+    if ble_id in ble_ids:
+        return error_response("BLE ID already exists for this user", 400)
+    
+    # Add new BLE ID
+    ble_ids.append(ble_id)
+    
+    await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {"ble_ids": ble_ids}}
+    )
+    
+    return success_response({
+        "message": "BLE ID added successfully.",
+        "user_id": user_id,
+        "ble_ids": ble_ids
+    })
+
+@api_router.delete("/users/{user_id}/ble-id")
+async def remove_ble_id(user_id: int, ble_id: str, email: str = Depends(verify_jwt_token)):
+    if not ble_id:
+        return error_response("BLE ID is required", 400)
+    
+    # Get current user
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user:
+        return error_response("User not found", 404)
+    
+    # Get current BLE IDs
+    ble_ids = get_ble_ids(user)
+    
+    # Check if BLE ID exists
+    if ble_id not in ble_ids:
+        return error_response("BLE ID not found for this user", 404)
+    
+    # Remove BLE ID
+    ble_ids.remove(ble_id)
+    
+    await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {"ble_ids": ble_ids}}
+    )
+    
+    return success_response({
+        "message": "BLE ID removed successfully.",
+        "user_id": user_id,
+        "ble_ids": ble_ids
+    })
+
+# ============ PASSWORD RESET ROUTE ============
+
 @api_router.patch("/users/{user_id}/reset-password")
 async def reset_password(user_id: int, email: str = Depends(verify_jwt_token)):
     # Generate new password
@@ -420,95 +549,29 @@ async def reset_password(user_id: int, email: str = Depends(verify_jwt_token)):
         "new_password": new_password
     })
 
-# Reset Secret Code (Protected)
-@api_router.patch("/users/{user_id}/reset-secret-code")
-async def reset_secret_code(user_id: int, email: str = Depends(verify_jwt_token)):
-    # Generate new secret code
-    new_secret_code = generate_secret_code(5)
-    
-    result = await db.users.update_one(
-        {"user_id": user_id},
-        {"$set": {"secret_code": new_secret_code}}
-    )
-    
-    if result.matched_count == 0:
-        return error_response("User not found", 404)
-    
-    return success_response({
-        "message": "Secret code reset successfully.",
-        "user_id": user_id,
-        "new_secret_code": new_secret_code
-    })
+# ============ UTILITY ROUTES ============
 
-# Add Device ID (Protected)
-@api_router.post("/users/{user_id}/device-id")
-async def add_device_id(user_id: int, device_id: str, email: str = Depends(verify_jwt_token)):
+@api_router.get("/users/get-details-by-device-id")
+async def get_details_by_device_id(device_id: str):
     if not device_id:
         return error_response("Device ID is required", 400)
     
-    # Get current user
-    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    # Search in device_ids array
+    user = await db.users.find_one({"device_ids": device_id}, {"_id": 0})
+    
+    # Backward compatibility
     if not user:
-        return error_response("User not found", 404)
+        user = await db.users.find_one({"device_number": device_id}, {"_id": 0})
     
-    # Get current device IDs
-    device_ids = user.get("device_ids", [])
-    if not device_ids and user.get("device_number"):
-        device_ids = [user.get("device_number")]
-    
-    # Check if device ID already exists
-    if device_id in device_ids:
-        return error_response("Device ID already exists for this user", 400)
-    
-    # Add new device ID
-    device_ids.append(device_id)
-    
-    result = await db.users.update_one(
-        {"user_id": user_id},
-        {"$set": {"device_ids": device_ids}}
-    )
+    if not user:
+        return error_response("No user found with this device ID", 404)
     
     return success_response({
-        "message": "Device ID added successfully.",
-        "user_id": user_id,
-        "device_ids": device_ids
+        "phone": user["phone"]
     })
 
-# Remove Device ID (Protected)
-@api_router.delete("/users/{user_id}/device-id")
-async def remove_device_id(user_id: int, device_id: str, email: str = Depends(verify_jwt_token)):
-    if not device_id:
-        return error_response("Device ID is required", 400)
-    
-    # Get current user
-    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-    if not user:
-        return error_response("User not found", 404)
-    
-    # Get current device IDs
-    device_ids = user.get("device_ids", [])
-    if not device_ids and user.get("device_number"):
-        device_ids = [user.get("device_number")]
-    
-    # Check if device ID exists
-    if device_id not in device_ids:
-        return error_response("Device ID not found for this user", 404)
-    
-    # Remove device ID
-    device_ids.remove(device_id)
-    
-    result = await db.users.update_one(
-        {"user_id": user_id},
-        {"$set": {"device_ids": device_ids}}
-    )
-    
-    return success_response({
-        "message": "Device ID removed successfully.",
-        "user_id": user_id,
-        "device_ids": device_ids
-    })
+# ============ HEALTH CHECK ============
 
-# Health check
 @api_router.get("/")
 async def root():
     return success_response({"message": "MathayBari Admin API"})
