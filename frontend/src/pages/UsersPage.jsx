@@ -23,7 +23,7 @@ import {
   Chip,
   Tooltip,
 } from '@mui/material';
-import { Delete, People, CheckCircle, Cancel, Key, Add, Close } from '@mui/icons-material';
+import { Delete, People, CheckCircle, Cancel, Key, Add, Close, Bluetooth, PhoneAndroid } from '@mui/icons-material';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -47,8 +47,14 @@ export const UsersPage = () => {
   const [addDeviceId, setAddDeviceId] = useState('');
   const [addingDevice, setAddingDevice] = useState(false);
 
-  // Deleting device ID state
+  // Add BLE ID modal state
+  const [addBleDialogOpen, setAddBleDialogOpen] = useState(false);
+  const [addBleId, setAddBleId] = useState('');
+  const [addingBle, setAddingBle] = useState(false);
+
+  // Deleting states
   const [deletingDeviceId, setDeletingDeviceId] = useState(null);
+  const [deletingBleId, setDeletingBleId] = useState(null);
 
   useEffect(() => {
     fetchUsers();
@@ -155,6 +161,7 @@ export const UsersPage = () => {
     }
   };
 
+  // Device ID handlers
   const handleOpenAddDevice = (user) => {
     setSelectedUser(user);
     setAddDeviceId('');
@@ -207,7 +214,6 @@ export const UsersPage = () => {
       
       if (response.data.status === 'success') {
         toast.success('Device ID deleted successfully');
-        // Update local state immediately for better UX
         setUsers(prevUsers => prevUsers.map(user => {
           if (user.user_id === userId) {
             return {
@@ -224,6 +230,82 @@ export const UsersPage = () => {
       toast.error(error.response?.data?.data?.message || 'Failed to delete Device ID');
     } finally {
       setDeletingDeviceId(null);
+    }
+  };
+
+  // BLE ID handlers
+  const handleOpenAddBle = (user) => {
+    setSelectedUser(user);
+    setAddBleId('');
+    setAddBleDialogOpen(true);
+  };
+
+  const handleAddBleId = async () => {
+    if (!addBleId.trim()) {
+      toast.error('BLE ID is required');
+      return;
+    }
+    if (addBleId.length !== 8) {
+      toast.error('BLE ID must be 8 characters');
+      return;
+    }
+
+    setAddingBle(true);
+    
+    try {
+      const response = await axios.post(
+        `${API}/users/${selectedUser.user_id}/ble-id?ble_id=${encodeURIComponent(addBleId)}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (response.data.status === 'success') {
+        toast.success('BLE ID added successfully');
+        setAddBleDialogOpen(false);
+        setSelectedUser(null);
+        setAddBleId('');
+        fetchUsers();
+      } else {
+        toast.error(response.data.data.message || 'Failed to add BLE ID');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.data?.message || 'Failed to add BLE ID');
+    } finally {
+      setAddingBle(false);
+    }
+  };
+
+  const handleDeleteBleId = async (userId, bleIdToDelete) => {
+    if (!window.confirm(`Delete BLE ID ${bleIdToDelete}?`)) {
+      return;
+    }
+
+    setDeletingBleId(`${userId}-${bleIdToDelete}`);
+    
+    try {
+      const response = await axios.delete(
+        `${API}/users/${userId}/ble-id?ble_id=${encodeURIComponent(bleIdToDelete)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (response.data.status === 'success') {
+        toast.success('BLE ID deleted successfully');
+        setUsers(prevUsers => prevUsers.map(user => {
+          if (user.user_id === userId) {
+            return {
+              ...user,
+              ble_ids: user.ble_ids.filter(id => id !== bleIdToDelete)
+            };
+          }
+          return user;
+        }));
+      } else {
+        toast.error(response.data.data.message || 'Failed to delete BLE ID');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.data?.message || 'Failed to delete BLE ID');
+    } finally {
+      setDeletingBleId(null);
     }
   };
 
@@ -326,10 +408,11 @@ export const UsersPage = () => {
                 <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Phone</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Device IDs</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>BLE IDs</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Last Run Location</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Password</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 600, width: 180 }}>Actions</TableCell>
+                <TableCell sx={{ fontWeight: 600, width: 200 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -361,11 +444,41 @@ export const UsersPage = () => {
                             disabled={deletingDeviceId === `${user.user_id}-${devId}`}
                             sx={{
                               fontFamily: 'monospace',
-                              fontSize: '0.75rem',
+                              fontSize: '0.7rem',
                               height: 24,
-                              '& .MuiChip-deleteIcon': {
-                                fontSize: 14,
-                              },
+                              '& .MuiChip-deleteIcon': { fontSize: 14 },
+                            }}
+                          />
+                        ))}
+                      </Box>
+                    ) : (
+                      <Typography color="text.disabled">—</Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {user.ble_ids && user.ble_ids.length > 0 ? (
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {user.ble_ids.map((bleId, idx) => (
+                          <Chip
+                            key={idx}
+                            label={bleId}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                            onDelete={() => handleDeleteBleId(user.user_id, bleId)}
+                            deleteIcon={
+                              deletingBleId === `${user.user_id}-${bleId}` ? (
+                                <CircularProgress size={14} />
+                              ) : (
+                                <Close sx={{ fontSize: 14 }} />
+                              )
+                            }
+                            disabled={deletingBleId === `${user.user_id}-${bleId}`}
+                            sx={{
+                              fontFamily: 'monospace',
+                              fontSize: '0.7rem',
+                              height: 24,
+                              '& .MuiChip-deleteIcon': { fontSize: 14 },
                             }}
                           />
                         ))}
@@ -428,11 +541,24 @@ export const UsersPage = () => {
                           onClick={() => handleOpenAddDevice(user)}
                           data-testid={`add-device-${user.user_id}`}
                           sx={{
+                            color: '#9c27b0',
+                            '&:hover': { bgcolor: 'rgba(156, 39, 176, 0.1)' },
+                          }}
+                        >
+                          <PhoneAndroid fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Add BLE ID">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleOpenAddBle(user)}
+                          data-testid={`add-ble-${user.user_id}`}
+                          sx={{
                             color: '#00bcd4',
                             '&:hover': { bgcolor: 'rgba(0, 188, 212, 0.1)' },
                           }}
                         >
-                          <Add fontSize="small" />
+                          <Bluetooth fontSize="small" />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Reset Password">
@@ -507,14 +633,14 @@ export const UsersPage = () => {
         <DialogTitle sx={{ fontWeight: 600 }}>Activate User</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Enter a Device ID to activate <strong>{selectedUser?.name}</strong>.
+            Enter the Device ID (phone identifier) to activate <strong>{selectedUser?.name}</strong>.
           </Typography>
           
           <TextField
             fullWidth
             label="Device ID"
             value={deviceId}
-            onChange={(e) => setDeviceId(e.target.value.toUpperCase())}
+            onChange={(e) => setDeviceId(e.target.value)}
             placeholder="Enter Device ID"
             disabled={activating}
             required
@@ -565,7 +691,7 @@ export const UsersPage = () => {
         <DialogTitle sx={{ fontWeight: 600 }}>Add Device ID</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Add a Device ID for <strong>{selectedUser?.name}</strong>.
+            Add a Device ID (phone identifier) for <strong>{selectedUser?.name}</strong>.
           </Typography>
           
           {selectedUser?.device_ids?.length > 0 && (
@@ -573,12 +699,7 @@ export const UsersPage = () => {
               <Typography variant="subtitle2" sx={{ mb: 1 }}>Current Device IDs:</Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                 {selectedUser.device_ids.map((devId, idx) => (
-                  <Chip
-                    key={idx}
-                    label={devId}
-                    size="small"
-                    sx={{ fontFamily: 'monospace' }}
-                  />
+                  <Chip key={idx} label={devId} size="small" sx={{ fontFamily: 'monospace' }} />
                 ))}
               </Box>
             </Box>
@@ -588,7 +709,7 @@ export const UsersPage = () => {
             fullWidth
             label="New Device ID"
             value={addDeviceId}
-            onChange={(e) => setAddDeviceId(e.target.value.toUpperCase())}
+            onChange={(e) => setAddDeviceId(e.target.value)}
             placeholder="Enter Device ID"
             disabled={addingDevice}
             required
@@ -613,13 +734,83 @@ export const UsersPage = () => {
             disabled={addingDevice || !addDeviceId.trim()}
             sx={{
               borderRadius: 3,
+              bgcolor: '#9c27b0',
+              color: '#fff',
+              fontWeight: 600,
+              '&:hover': { bgcolor: '#7b1fa2' },
+            }}
+          >
+            {addingDevice ? <CircularProgress size={24} color="inherit" /> : 'Add Device ID'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Add BLE ID Dialog */}
+      <Dialog
+        open={addBleDialogOpen}
+        onClose={() => {
+          setAddBleDialogOpen(false);
+          setSelectedUser(null);
+          setAddBleId('');
+        }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 4 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 600 }}>Add BLE ID</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Add an 8-character BLE ID for <strong>{selectedUser?.name}</strong>.
+          </Typography>
+          
+          {selectedUser?.ble_ids?.length > 0 && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>Current BLE IDs:</Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {selectedUser.ble_ids.map((bleId, idx) => (
+                  <Chip key={idx} label={bleId} size="small" color="primary" variant="outlined" sx={{ fontFamily: 'monospace' }} />
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          <TextField
+            fullWidth
+            label="New BLE ID"
+            value={addBleId}
+            onChange={(e) => setAddBleId(e.target.value.toUpperCase().slice(0, 8))}
+            placeholder="Enter 8-character BLE ID"
+            disabled={addingBle}
+            required
+            helperText={`${addBleId.length}/8 characters`}
+            InputProps={{ sx: { borderRadius: 3 } }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button
+            onClick={() => {
+              setAddBleDialogOpen(false);
+              setSelectedUser(null);
+              setAddBleId('');
+            }}
+            disabled={addingBle}
+            sx={{ borderRadius: 3 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleAddBleId}
+            disabled={addingBle || addBleId.length !== 8}
+            sx={{
+              borderRadius: 3,
               bgcolor: '#00bcd4',
               color: '#fff',
               fontWeight: 600,
               '&:hover': { bgcolor: '#00acc1' },
             }}
           >
-            {addingDevice ? <CircularProgress size={24} color="inherit" /> : 'Add Device ID'}
+            {addingBle ? <CircularProgress size={24} color="inherit" /> : 'Add BLE ID'}
           </Button>
         </DialogActions>
       </Dialog>
