@@ -372,8 +372,6 @@ async def update_user_status(user_id: int, status: str, device_id: str = None, e
     if status == "Active":
         if not device_id:
             return error_response("Device ID is required when activating a user", 400)
-        if len(device_id) != 8:
-            return error_response("Device ID must be 8 characters", 400)
     
     update_data = {"status": status}
     if status == "Active":
@@ -447,9 +445,6 @@ async def reset_secret_code(user_id: int, email: str = Depends(verify_jwt_token)
 async def add_device_id(user_id: int, device_id: str, email: str = Depends(verify_jwt_token)):
     if not device_id:
         return error_response("Device ID is required", 400)
-    
-    if len(device_id) != 8:
-        return error_response("Device ID must be 8 characters", 400)
     
     # Get current user
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})

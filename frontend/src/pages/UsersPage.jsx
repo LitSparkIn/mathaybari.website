@@ -127,10 +127,6 @@ export const UsersPage = () => {
       toast.error('Device ID is required');
       return;
     }
-    if (deviceId.length !== 8) {
-      toast.error('Device ID must be 8 characters');
-      return;
-    }
 
     setActivating(true);
     
@@ -168,10 +164,6 @@ export const UsersPage = () => {
   const handleAddDeviceId = async () => {
     if (!addDeviceId.trim()) {
       toast.error('Device ID is required');
-      return;
-    }
-    if (addDeviceId.length !== 8) {
-      toast.error('Device ID must be 8 characters');
       return;
     }
 
@@ -515,21 +507,17 @@ export const UsersPage = () => {
         <DialogTitle sx={{ fontWeight: 600 }}>Activate User</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Enter an 8-character Device ID to activate <strong>{selectedUser?.name}</strong>.
+            Enter a Device ID to activate <strong>{selectedUser?.name}</strong>.
           </Typography>
           
           <TextField
             fullWidth
             label="Device ID"
             value={deviceId}
-            onChange={(e) => {
-              const val = e.target.value.toUpperCase().slice(0, 8);
-              setDeviceId(val);
-            }}
-            placeholder="Enter 8-character Device ID"
+            onChange={(e) => setDeviceId(e.target.value.toUpperCase())}
+            placeholder="Enter Device ID"
             disabled={activating}
             required
-            helperText={`${deviceId.length}/8 characters`}
             InputProps={{ sx: { borderRadius: 3 } }}
           />
         </DialogContent>
@@ -548,7 +536,7 @@ export const UsersPage = () => {
           <Button
             variant="contained"
             onClick={handleActivateUser}
-            disabled={activating || deviceId.length !== 8}
+            disabled={activating || !deviceId.trim()}
             sx={{
               borderRadius: 3,
               bgcolor: '#4caf50',
@@ -577,7 +565,7 @@ export const UsersPage = () => {
         <DialogTitle sx={{ fontWeight: 600 }}>Add Device ID</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Add an 8-character Device ID for <strong>{selectedUser?.name}</strong>.
+            Add a Device ID for <strong>{selectedUser?.name}</strong>.
           </Typography>
           
           {selectedUser?.device_ids?.length > 0 && (
@@ -600,14 +588,10 @@ export const UsersPage = () => {
             fullWidth
             label="New Device ID"
             value={addDeviceId}
-            onChange={(e) => {
-              const val = e.target.value.toUpperCase().slice(0, 8);
-              setAddDeviceId(val);
-            }}
-            placeholder="Enter 8-character Device ID"
+            onChange={(e) => setAddDeviceId(e.target.value.toUpperCase())}
+            placeholder="Enter Device ID"
             disabled={addingDevice}
             required
-            helperText={`${addDeviceId.length}/8 characters`}
             InputProps={{ sx: { borderRadius: 3 } }}
           />
         </DialogContent>
@@ -626,7 +610,7 @@ export const UsersPage = () => {
           <Button
             variant="contained"
             onClick={handleAddDeviceId}
-            disabled={addingDevice || addDeviceId.length !== 8}
+            disabled={addingDevice || !addDeviceId.trim()}
             sx={{
               borderRadius: 3,
               bgcolor: '#00bcd4',
