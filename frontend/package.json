@@ -62,7 +62,7 @@
   "scripts": {
     "start": "cross-env REACT_APP_BACKEND_URL=http://localhost:8901 craco start",
     "build": "cross-env REACT_APP_BACKEND_URL=http://localhost:8901 craco build",
-    "build:production": "cross-env REACT_APP_BACKEND_URL=https://mathaybari.online craco build",
+    "build:production": "cross-env REACT_APP_BACKEND_URL=https://mathaybari.online/api craco build",
     "test": "craco test"
   },
   "browserslist": {
