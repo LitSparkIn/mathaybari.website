@@ -1,0 +1,55 @@
+
+name: mathaybari_app
+
+version: "3.9"
+
+services:
+
+  mongo:
+    image: mongo:7
+    container_name: mathaybari_db
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "27016:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - mathaybari_network
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mathaybari_api
+    env_file: .env
+    ports:
+      - "8901:8901"
+    depends_on:
+      - mongo
+    volumes:
+      - ./:/app
+      - ./uploads:/uploads
+    networks:
+      - mathaybari_network
+    command: uvicorn backend.server:app --host 0.0.0.0 --port 8901 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: mathaybari_frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "8900:80"
+    networks:
+      - mathaybari_network
+
+volumes:
+  mongo_data:
+
+networks:
+  mathaybari_network:
+    driver: bridge

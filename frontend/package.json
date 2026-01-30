@@ -40,6 +40,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "cra-template": "1.2.0",
+    "cross-env": "^10.1.0",
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
@@ -59,8 +60,9 @@
     "zod": "^3.24.4"
   },
   "scripts": {
-    "start": "craco start",
-    "build": "craco build",
+    "start": "cross-env REACT_APP_BACKEND_URL=http://localhost:8901 craco start",
+    "build": "cross-env REACT_APP_BACKEND_URL=http://localhost:8901 craco build",
+    "build:production": "cross-env REACT_APP_BACKEND_URL=https://mathaybari.online craco build",
     "test": "craco test"
   },
   "browserslist": {
