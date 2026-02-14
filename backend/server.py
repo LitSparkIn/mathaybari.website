@@ -167,15 +167,14 @@ def get_ble_ids(user: dict) -> List[str]:
             ble_ids = [user.get("device_mac_address")]
     return ble_ids
 
-# Device tracking helpers
-async def add_device_to_tracking(device_id: str, user_id: int, phone: str, name: str):
-    """Add or update device in devices collection"""
-    await db.devices.update_one(
-        {"device_id": device_id.lower()},
+# BLE tracking helpers
+async def add_ble_to_tracking(ble_id: str, user_id: int, phone: str, name: str):
+    """Add or update BLE in ble_usage collection"""
+    await db.ble_usage.update_one(
+        {"ble_id": ble_id},
         {
             "$set": {
-                "device_id": device_id.lower(),
-                "device_id_original": device_id,
+                "ble_id": ble_id,
                 "user_id": user_id,
                 "phone": phone,
                 "user_name": name,
@@ -189,10 +188,10 @@ async def add_device_to_tracking(device_id: str, user_id: int, phone: str, name:
         upsert=True
     )
 
-async def remove_user_from_device(device_id: str, user_id: int):
-    """Remove user info from device if it belongs to this user"""
-    await db.devices.update_one(
-        {"device_id": device_id.lower(), "user_id": user_id},
+async def remove_ble_from_tracking(ble_id: str, user_id: int):
+    """Remove user info from BLE if it belongs to this user"""
+    await db.ble_usage.update_one(
+        {"ble_id": ble_id, "user_id": user_id},
         {
             "$set": {
                 "user_id": None,
@@ -203,21 +202,23 @@ async def remove_user_from_device(device_id: str, user_id: int):
         }
     )
 
-async def update_devices_last_login(user_id: int):
-    """Update last_logged_in for all devices of a user"""
-    await db.devices.update_many(
+async def update_ble_last_login(user_id: int):
+    """Update last_logged_in for all BLEs of a user"""
+    await db.ble_usage.update_many(
         {"user_id": user_id},
         {"$set": {"last_logged_in": datetime.now(timezone.utc).isoformat()}}
     )
 
-async def save_login_history(user_id: int, phone: str, name: str, device_id: str, 
-                             location: Optional[str], lat_long: Optional[str], success: bool):
+async def save_login_history(user_id: int, phone: str, name: str, device_id: str,
+                             ble_ids: List[str], location: Optional[str], 
+                             lat_long: Optional[str], success: bool):
     """Save login attempt to history"""
     await db.login_history.insert_one({
         "user_id": user_id,
         "phone": phone,
         "user_name": name,
         "device_id": device_id,
+        "ble_ids": ble_ids,
         "location": location,
         "lat_long": lat_long,
         "success": success,
@@ -272,15 +273,16 @@ async def user_login(request: UserLoginRequest):
     # Get BLE IDs
     ble_ids = get_ble_ids(user)
     
-    # Update last_logged_in for all devices of this user
-    await update_devices_last_login(user["user_id"])
+    # Update last_logged_in for all BLEs of this user
+    await update_ble_last_login(user["user_id"])
     
-    # Save login history
+    # Save login history with BLE IDs
     await save_login_history(
         user_id=user["user_id"],
         phone=user["phone"],
         name=user["name"],
         device_id=request.device_id,
+        ble_ids=ble_ids,
         location=request.last_known_location,
         lat_long=request.last_known_lat_long,
         success=True
@@ -426,12 +428,12 @@ async def get_users_count(email: str = Depends(verify_jwt_token)):
 
 @api_router.delete("/users/{user_id}")
 async def delete_user(user_id: int, email: str = Depends(verify_jwt_token)):
-    # Get user first to remove device tracking
+    # Get user first to remove BLE tracking
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
     if user:
-        device_ids = get_device_ids(user)
-        for device_id in device_ids:
-            await remove_user_from_device(device_id, user_id)
+        ble_ids = get_ble_ids(user)
+        for ble_id in ble_ids:
+            await remove_ble_from_tracking(ble_id, user_id)
     
     result = await db.users.delete_one({"user_id": user_id})
     if result.deleted_count == 0:
@@ -464,8 +466,6 @@ async def update_user_status(user_id: int, status: str, device_id: str = None, e
         if device_id not in existing_device_ids:
             existing_device_ids.append(device_id)
             update_data["device_ids"] = existing_device_ids
-            # Add to device tracking
-            await add_device_to_tracking(device_id, user_id, user["phone"], user["name"])
     
     result = await db.users.update_one(
         {"user_id": user_id},
@@ -503,9 +503,6 @@ async def add_device_id(user_id: int, device_id: str, email: str = Depends(verif
         {"$set": {"device_ids": device_ids}}
     )
     
-    # Add to device tracking
-    await add_device_to_tracking(device_id, user_id, user["phone"], user["name"])
-    
     return success_response({
         "message": "Device ID added successfully.",
         "user_id": user_id,
@@ -535,9 +532,6 @@ async def remove_device_id(user_id: int, device_id: str, email: str = Depends(ve
         {"user_id": user_id},
         {"$set": {"device_ids": device_ids}}
     )
-    
-    # Remove user from device tracking
-    await remove_user_from_device(device_id, user_id)
     
     return success_response({
         "message": "Device ID removed successfully.",
@@ -571,6 +565,9 @@ async def add_ble_id(user_id: int, ble_id: str, email: str = Depends(verify_jwt_
         {"$set": {"ble_ids": ble_ids}}
     )
     
+    # Add to BLE tracking
+    await add_ble_to_tracking(ble_id, user_id, user["phone"], user["name"])
+    
     return success_response({
         "message": "BLE ID added successfully.",
         "user_id": user_id,
@@ -597,6 +594,9 @@ async def remove_ble_id(user_id: int, ble_id: str, email: str = Depends(verify_j
         {"user_id": user_id},
         {"$set": {"ble_ids": ble_ids}}
     )
+    
+    # Remove from BLE tracking
+    await remove_ble_from_tracking(ble_id, user_id)
     
     return success_response({
         "message": "BLE ID removed successfully.",
@@ -627,16 +627,16 @@ async def reset_password(user_id: int, email: str = Depends(verify_jwt_token)):
         "new_password": new_password
     })
 
-# ============ DEVICES TRACKING ROUTES ============
+# ============ BLE USAGE TRACKING ROUTES ============
 
-@api_router.get("/devices")
-async def get_devices(email: str = Depends(verify_jwt_token)):
-    devices_cursor = db.devices.find({}, {"_id": 0}).sort("last_logged_in", -1)
-    devices = await devices_cursor.to_list(1000)
+@api_router.get("/ble-usage")
+async def get_ble_usage(email: str = Depends(verify_jwt_token)):
+    ble_cursor = db.ble_usage.find({}, {"_id": 0}).sort("last_logged_in", -1)
+    ble_list = await ble_cursor.to_list(1000)
     
     return success_response({
-        "devices": devices,
-        "total": len(devices)
+        "ble_devices": ble_list,
+        "total": len(ble_list)
     })
 
 # ============ LOGIN HISTORY ROUTES ============
