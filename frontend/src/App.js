@@ -8,7 +8,7 @@ import { Sidebar } from './components/Sidebar';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { UsersPage } from './pages/UsersPage';
-import { UsageByDevicePage } from './pages/UsageByDevicePage';
+import { UsageByBlePage } from './pages/UsageByBlePage';
 import { LoginHistoryPage } from './pages/LoginHistoryPage';
 import './App.css';
 
@@ -129,7 +129,7 @@ function App() {
             <Route element={<ProtectedRoute />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/users" element={<UsersPage />} />
-              <Route path="/usage-by-device" element={<UsageByDevicePage />} />
+              <Route path="/usage-by-ble" element={<UsageByBlePage />} />
               <Route path="/login-history" element={<LoginHistoryPage />} />
             </Route>
 
