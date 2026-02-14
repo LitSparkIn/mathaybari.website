@@ -91,6 +91,8 @@ class UserLoginRequest(BaseModel):
     phone: str
     password: str
     device_id: str
+    last_known_location: Optional[str] = None
+    last_known_lat_long: Optional[str] = None
 
 class UserSignupRequest(BaseModel):
     name: str
@@ -101,8 +103,8 @@ class User(BaseModel):
     user_id: int
     name: str
     phone: str
-    device_ids: List[str] = []      # Phone device IDs (alphanumeric)
-    ble_ids: List[str] = []          # BLE IDs (8 digits)
+    device_ids: List[str] = []
+    ble_ids: List[str] = []
     last_run_location: str = ""
     password: str
     secret_code: str
@@ -150,7 +152,6 @@ def verify_jwt_token(credentials: HTTPAuthorizationCredentials = Depends(securit
 # Helper to get device_ids with backward compatibility
 def get_device_ids(user: dict) -> List[str]:
     device_ids = user.get("device_ids", [])
-    # Backward compatibility with old field names
     if not device_ids:
         if user.get("device_number"):
             device_ids = [user.get("device_number")]
@@ -159,13 +160,69 @@ def get_device_ids(user: dict) -> List[str]:
 # Helper to get ble_ids with backward compatibility
 def get_ble_ids(user: dict) -> List[str]:
     ble_ids = user.get("ble_ids", [])
-    # Backward compatibility with old field names
     if not ble_ids:
         if user.get("device_mac_addresses"):
             ble_ids = user.get("device_mac_addresses")
         elif user.get("device_mac_address"):
             ble_ids = [user.get("device_mac_address")]
     return ble_ids
+
+# Device tracking helpers
+async def add_device_to_tracking(device_id: str, user_id: int, phone: str, name: str):
+    """Add or update device in devices collection"""
+    await db.devices.update_one(
+        {"device_id": device_id.lower()},
+        {
+            "$set": {
+                "device_id": device_id.lower(),
+                "device_id_original": device_id,
+                "user_id": user_id,
+                "phone": phone,
+                "user_name": name,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            },
+            "$setOnInsert": {
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "last_logged_in": None
+            }
+        },
+        upsert=True
+    )
+
+async def remove_user_from_device(device_id: str, user_id: int):
+    """Remove user info from device if it belongs to this user"""
+    await db.devices.update_one(
+        {"device_id": device_id.lower(), "user_id": user_id},
+        {
+            "$set": {
+                "user_id": None,
+                "phone": None,
+                "user_name": None,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+
+async def update_devices_last_login(user_id: int):
+    """Update last_logged_in for all devices of a user"""
+    await db.devices.update_many(
+        {"user_id": user_id},
+        {"$set": {"last_logged_in": datetime.now(timezone.utc).isoformat()}}
+    )
+
+async def save_login_history(user_id: int, phone: str, name: str, device_id: str, 
+                             location: Optional[str], lat_long: Optional[str], success: bool):
+    """Save login attempt to history"""
+    await db.login_history.insert_one({
+        "user_id": user_id,
+        "phone": phone,
+        "user_name": name,
+        "device_id": device_id,
+        "location": location,
+        "lat_long": lat_long,
+        "success": success,
+        "logged_in_at": datetime.now(timezone.utc).isoformat()
+    })
 
 # ============ ADMIN AUTH ROUTES ============
 
@@ -215,6 +272,27 @@ async def user_login(request: UserLoginRequest):
     # Get BLE IDs
     ble_ids = get_ble_ids(user)
     
+    # Update last_logged_in for all devices of this user
+    await update_devices_last_login(user["user_id"])
+    
+    # Save login history
+    await save_login_history(
+        user_id=user["user_id"],
+        phone=user["phone"],
+        name=user["name"],
+        device_id=request.device_id,
+        location=request.last_known_location,
+        lat_long=request.last_known_lat_long,
+        success=True
+    )
+    
+    # Update user's last run location if provided
+    if request.last_known_location:
+        await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {"last_run_location": request.last_known_location}}
+        )
+    
     return success_response({
         "token": token,
         "user_id": user["user_id"],
@@ -229,35 +307,28 @@ async def user_login(request: UserLoginRequest):
 @api_router.post("/users/validate")
 async def validate_user(request: ValidateUserRequest):
     try:
-        # Decode and verify token
         payload = jwt.decode(request.token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         
-        # Check if it's a user token
         if payload.get("type") != "user":
             return error_response("User Invalid", 401)
         
         user_id = int(payload.get("sub"))
         token_version = payload.get("token_version", 1)
         
-        # Find user in database
         user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
         
         if not user:
             return error_response("User Invalid", 401)
         
-        # Check if token version matches
         if user.get("token_version", 1) != token_version:
             return error_response("User Invalid", 401)
         
-        # Check if user is active
         if user.get("status") != "Active":
             return error_response("User Invalid", 401)
         
-        # Validate phone
         if user.get("phone") != request.phone:
             return error_response("User Invalid", 401)
         
-        # Validate password
         if user.get("password") != request.password:
             return error_response("User Invalid", 401)
         
@@ -282,12 +353,10 @@ async def validate_user(request: ValidateUserRequest):
 
 @api_router.post("/users/signup")
 async def signup_user(request: UserSignupRequest):
-    # Check if phone already exists
     existing = await db.users.find_one({"phone": request.phone}, {"_id": 0})
     if existing:
         return error_response("User with this phone number already exists", 400)
     
-    # Generate user data
     user_id = await get_next_user_id()
     password = generate_password(6)
     secret_code = generate_secret_code(5)
@@ -357,6 +426,13 @@ async def get_users_count(email: str = Depends(verify_jwt_token)):
 
 @api_router.delete("/users/{user_id}")
 async def delete_user(user_id: int, email: str = Depends(verify_jwt_token)):
+    # Get user first to remove device tracking
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if user:
+        device_ids = get_device_ids(user)
+        for device_id in device_ids:
+            await remove_user_from_device(device_id, user_id)
+    
     result = await db.users.delete_one({"user_id": user_id})
     if result.deleted_count == 0:
         return error_response("User not found", 404)
@@ -372,27 +448,34 @@ async def update_user_status(user_id: int, status: str, device_id: str = None, e
     if status not in ["Active", "Inactive"]:
         return error_response("Status must be 'Active' or 'Inactive'", 400)
     
-    # Device ID is required when activating
     if status == "Active":
         if not device_id:
             return error_response("Device ID is required when activating a user", 400)
     
+    # Get user info for device tracking
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user:
+        return error_response("User not found", 404)
+    
     update_data = {"status": status}
     if status == "Active":
-        update_data["device_ids"] = [device_id]
+        # Check if device_id already exists in user's list
+        existing_device_ids = get_device_ids(user)
+        if device_id not in existing_device_ids:
+            existing_device_ids.append(device_id)
+            update_data["device_ids"] = existing_device_ids
+            # Add to device tracking
+            await add_device_to_tracking(device_id, user_id, user["phone"], user["name"])
     
     result = await db.users.update_one(
         {"user_id": user_id},
         {"$set": update_data}
     )
     
-    if result.matched_count == 0:
-        return error_response("User not found", 404)
-    
     return success_response({
         "message": f"User status updated to {status}",
         "user_id": user_id,
-        "device_ids": [device_id] if status == "Active" else None
+        "device_ids": update_data.get("device_ids") or get_device_ids(user)
     })
 
 # ============ DEVICE ID ROUTES ============
@@ -402,25 +485,26 @@ async def add_device_id(user_id: int, device_id: str, email: str = Depends(verif
     if not device_id:
         return error_response("Device ID is required", 400)
     
-    # Get current user
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
     if not user:
         return error_response("User not found", 404)
     
-    # Get current device IDs
     device_ids = get_device_ids(user)
     
-    # Check if device ID already exists
-    if device_id in device_ids:
+    # Case-insensitive check
+    device_ids_lower = [d.lower() for d in device_ids]
+    if device_id.lower() in device_ids_lower:
         return error_response("Device ID already exists for this user", 400)
     
-    # Add new device ID
     device_ids.append(device_id)
     
     await db.users.update_one(
         {"user_id": user_id},
         {"$set": {"device_ids": device_ids}}
     )
+    
+    # Add to device tracking
+    await add_device_to_tracking(device_id, user_id, user["phone"], user["name"])
     
     return success_response({
         "message": "Device ID added successfully.",
@@ -433,25 +517,27 @@ async def remove_device_id(user_id: int, device_id: str, email: str = Depends(ve
     if not device_id:
         return error_response("Device ID is required", 400)
     
-    # Get current user
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
     if not user:
         return error_response("User not found", 404)
     
-    # Get current device IDs
     device_ids = get_device_ids(user)
     
-    # Check if device ID exists
-    if device_id not in device_ids:
+    # Case-insensitive removal
+    device_ids_lower = [d.lower() for d in device_ids]
+    if device_id.lower() not in device_ids_lower:
         return error_response("Device ID not found for this user", 404)
     
-    # Remove device ID
-    device_ids.remove(device_id)
+    # Find and remove the matching device_id
+    device_ids = [d for d in device_ids if d.lower() != device_id.lower()]
     
     await db.users.update_one(
         {"user_id": user_id},
         {"$set": {"device_ids": device_ids}}
     )
+    
+    # Remove user from device tracking
+    await remove_user_from_device(device_id, user_id)
     
     return success_response({
         "message": "Device ID removed successfully.",
@@ -469,19 +555,15 @@ async def add_ble_id(user_id: int, ble_id: str, email: str = Depends(verify_jwt_
     if len(ble_id) != 8:
         return error_response("BLE ID must be 8 characters", 400)
     
-    # Get current user
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
     if not user:
         return error_response("User not found", 404)
     
-    # Get current BLE IDs
     ble_ids = get_ble_ids(user)
     
-    # Check if BLE ID already exists
     if ble_id in ble_ids:
         return error_response("BLE ID already exists for this user", 400)
     
-    # Add new BLE ID
     ble_ids.append(ble_id)
     
     await db.users.update_one(
@@ -500,19 +582,15 @@ async def remove_ble_id(user_id: int, ble_id: str, email: str = Depends(verify_j
     if not ble_id:
         return error_response("BLE ID is required", 400)
     
-    # Get current user
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
     if not user:
         return error_response("User not found", 404)
     
-    # Get current BLE IDs
     ble_ids = get_ble_ids(user)
     
-    # Check if BLE ID exists
     if ble_id not in ble_ids:
         return error_response("BLE ID not found for this user", 404)
     
-    # Remove BLE ID
     ble_ids.remove(ble_id)
     
     await db.users.update_one(
@@ -530,10 +608,8 @@ async def remove_ble_id(user_id: int, ble_id: str, email: str = Depends(verify_j
 
 @api_router.patch("/users/{user_id}/reset-password")
 async def reset_password(user_id: int, email: str = Depends(verify_jwt_token)):
-    # Generate new password
     new_password = generate_password(6)
     
-    # Increment token_version to invalidate existing tokens
     result = await db.users.update_one(
         {"user_id": user_id},
         {
@@ -551,6 +627,30 @@ async def reset_password(user_id: int, email: str = Depends(verify_jwt_token)):
         "new_password": new_password
     })
 
+# ============ DEVICES TRACKING ROUTES ============
+
+@api_router.get("/devices")
+async def get_devices(email: str = Depends(verify_jwt_token)):
+    devices_cursor = db.devices.find({}, {"_id": 0}).sort("last_logged_in", -1)
+    devices = await devices_cursor.to_list(1000)
+    
+    return success_response({
+        "devices": devices,
+        "total": len(devices)
+    })
+
+# ============ LOGIN HISTORY ROUTES ============
+
+@api_router.get("/login-history")
+async def get_login_history(email: str = Depends(verify_jwt_token), limit: int = 100):
+    history_cursor = db.login_history.find({}, {"_id": 0}).sort("logged_in_at", -1).limit(limit)
+    history = await history_cursor.to_list(limit)
+    
+    return success_response({
+        "history": history,
+        "total": len(history)
+    })
+
 # ============ UTILITY ROUTES ============
 
 @api_router.get("/users/get-details-by-device-id")
@@ -558,10 +658,8 @@ async def get_details_by_device_id(device_id: str):
     if not device_id:
         return error_response("Device ID is required", 400)
     
-    # Search in device_ids array
     user = await db.users.find_one({"device_ids": device_id}, {"_id": 0})
     
-    # Backward compatibility
     if not user:
         user = await db.users.find_one({"device_number": device_id}, {"_id": 0})
     
