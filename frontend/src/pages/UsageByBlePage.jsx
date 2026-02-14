@@ -15,29 +15,29 @@ import {
   CircularProgress,
   Chip,
 } from '@mui/material';
-import { PhoneAndroid } from '@mui/icons-material';
+import { Bluetooth } from '@mui/icons-material';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
-export const UsageByDevicePage = () => {
-  const [devices, setDevices] = useState([]);
+export const UsageByBlePage = () => {
+  const [bleDevices, setBleDevices] = useState([]);
   const [loading, setLoading] = useState(true);
   const { token } = useAuth();
 
   useEffect(() => {
-    fetchDevices();
+    fetchBleUsage();
   }, []);
 
-  const fetchDevices = async () => {
+  const fetchBleUsage = async () => {
     try {
-      const response = await axios.get(`${API}/devices`, {
+      const response = await axios.get(`${API}/ble-usage`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setDevices(response.data.data.devices);
+      setBleDevices(response.data.data.ble_devices);
     } catch (error) {
-      toast.error('Failed to fetch devices');
-      console.error('Failed to fetch devices:', error);
+      toast.error('Failed to fetch BLE usage data');
+      console.error('Failed to fetch BLE usage:', error);
     } finally {
       setLoading(false);
     }
@@ -57,17 +57,17 @@ export const UsageByDevicePage = () => {
   };
 
   return (
-    <Box sx={{ p: { xs: 3, md: 4, lg: 6 } }} data-testid="usage-by-device-page">
+    <Box sx={{ p: { xs: 3, md: 4, lg: 6 } }} data-testid="usage-by-ble-page">
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 2 }}>
           Analytics
         </Typography>
         <Typography variant="h3" sx={{ fontWeight: 700, mt: 0.5 }}>
-          Usage by Device
+          Usage by BLE
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Track when each device was last used for login.
+          Track when each BLE device was last used.
         </Typography>
       </Box>
 
@@ -76,7 +76,7 @@ export const UsageByDevicePage = () => {
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
           <CircularProgress />
         </Box>
-      ) : devices.length === 0 ? (
+      ) : bleDevices.length === 0 ? (
         <Paper
           elevation={0}
           data-testid="empty-state"
@@ -101,20 +101,20 @@ export const UsageByDevicePage = () => {
               mb: 3,
             }}
           >
-            <PhoneAndroid sx={{ fontSize: 40, color: '#EF5C1E' }} />
+            <Bluetooth sx={{ fontSize: 40, color: '#EF5C1E' }} />
           </Box>
           <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-            No devices tracked yet
+            No BLE devices tracked yet
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 300, mx: 'auto' }}>
-            Device usage data will appear here once users start logging in.
+            BLE usage data will appear here once users with BLE IDs start logging in.
           </Typography>
         </Paper>
       ) : (
         <TableContainer
           component={Paper}
           elevation={0}
-          data-testid="devices-table-container"
+          data-testid="ble-table-container"
           sx={{
             borderRadius: 4,
             border: '1px solid',
@@ -124,7 +124,7 @@ export const UsageByDevicePage = () => {
           <Table>
             <TableHead>
               <TableRow sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
-                <TableCell sx={{ fontWeight: 600 }}>Device ID</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>BLE ID</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>User ID</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>User Name</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Phone</TableCell>
@@ -133,37 +133,37 @@ export const UsageByDevicePage = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {devices.map((device, index) => (
+              {bleDevices.map((ble, index) => (
                 <TableRow
-                  key={device.device_id || index}
-                  data-testid={`device-row-${device.device_id}`}
+                  key={ble.ble_id || index}
+                  data-testid={`ble-row-${ble.ble_id}`}
                   sx={{ '&:hover': { bgcolor: 'rgba(0,0,0,0.02)' } }}
                 >
                   <TableCell>
                     <Chip
-                      label={device.device_id_original || device.device_id}
+                      label={ble.ble_id}
                       size="small"
                       sx={{
                         fontFamily: 'monospace',
                         fontSize: '0.8rem',
-                        bgcolor: 'rgba(156, 39, 176, 0.1)',
-                        color: '#9c27b0',
+                        bgcolor: 'rgba(0, 188, 212, 0.1)',
+                        color: '#00acc1',
                       }}
                     />
                   </TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>
-                    {device.user_id || '—'}
+                    {ble.user_id || '—'}
                   </TableCell>
                   <TableCell sx={{ fontWeight: 500 }}>
-                    {device.user_name || '—'}
+                    {ble.user_name || '—'}
                   </TableCell>
                   <TableCell>
-                    {device.phone || '—'}
+                    {ble.phone || '—'}
                   </TableCell>
                   <TableCell>
-                    {device.last_logged_in ? (
+                    {ble.last_logged_in ? (
                       <Chip
-                        label={formatDate(device.last_logged_in)}
+                        label={formatDate(ble.last_logged_in)}
                         size="small"
                         sx={{
                           bgcolor: 'rgba(76, 175, 80, 0.1)',
@@ -176,7 +176,7 @@ export const UsageByDevicePage = () => {
                     )}
                   </TableCell>
                   <TableCell sx={{ color: 'text.secondary' }}>
-                    {formatDate(device.created_at)}
+                    {formatDate(ble.created_at)}
                   </TableCell>
                 </TableRow>
               ))}
@@ -186,14 +186,14 @@ export const UsageByDevicePage = () => {
       )}
 
       {/* Total count */}
-      {!loading && devices.length > 0 && (
+      {!loading && bleDevices.length > 0 && (
         <Typography
           variant="body2"
           color="text.secondary"
           sx={{ mt: 2 }}
-          data-testid="devices-total-count"
+          data-testid="ble-total-count"
         >
-          Total: {devices.length} device{devices.length !== 1 ? 's' : ''}
+          Total: {bleDevices.length} BLE device{bleDevices.length !== 1 ? 's' : ''}
         </Typography>
       )}
     </Box>

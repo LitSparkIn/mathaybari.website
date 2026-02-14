@@ -128,7 +128,7 @@ export const LoginHistoryPage = () => {
                 <TableCell sx={{ fontWeight: 600 }}>User ID</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>User Name</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Phone</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Device ID</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>BLE IDs</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Location</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Coordinates</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
@@ -156,16 +156,25 @@ export const LoginHistoryPage = () => {
                     {record.phone}
                   </TableCell>
                   <TableCell>
-                    <Chip
-                      label={record.device_id}
-                      size="small"
-                      sx={{
-                        fontFamily: 'monospace',
-                        fontSize: '0.75rem',
-                        bgcolor: 'rgba(156, 39, 176, 0.1)',
-                        color: '#9c27b0',
-                      }}
-                    />
+                    {record.ble_ids && record.ble_ids.length > 0 ? (
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {record.ble_ids.map((bleId, idx) => (
+                          <Chip
+                            key={idx}
+                            label={bleId}
+                            size="small"
+                            sx={{
+                              fontFamily: 'monospace',
+                              fontSize: '0.7rem',
+                              bgcolor: 'rgba(0, 188, 212, 0.1)',
+                              color: '#00acc1',
+                            }}
+                          />
+                        ))}
+                      </Box>
+                    ) : (
+                      <Typography color="text.disabled">—</Typography>
+                    )}
                   </TableCell>
                   <TableCell sx={{ maxWidth: 200 }}>
                     {record.location ? (
