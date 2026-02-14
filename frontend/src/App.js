@@ -8,6 +8,8 @@ import { Sidebar } from './components/Sidebar';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { UsersPage } from './pages/UsersPage';
+import { UsageByDevicePage } from './pages/UsageByDevicePage';
+import { LoginHistoryPage } from './pages/LoginHistoryPage';
 import './App.css';
 
 // Create MUI theme with Noto Sans and custom colors
@@ -127,6 +129,8 @@ function App() {
             <Route element={<ProtectedRoute />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/users" element={<UsersPage />} />
+              <Route path="/usage-by-device" element={<UsageByDevicePage />} />
+              <Route path="/login-history" element={<LoginHistoryPage />} />
             </Route>
 
             {/* Redirect root to dashboard or login */}
