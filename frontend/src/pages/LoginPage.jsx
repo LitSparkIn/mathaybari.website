@@ -18,7 +18,6 @@ import { Visibility, VisibilityOff, ArrowForward, Block } from '@mui/icons-mater
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
-const STATUS_CHECK_URL = 'https://dashboard.litspark.cloud/';
 
 export const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -36,8 +35,8 @@ export const LoginPage = () => {
 
   const checkLoginStatus = async () => {
     try {
-      const response = await axios.get(STATUS_CHECK_URL, { timeout: 5000 });
-      if (response.data?.status === 'inactive') {
+      const response = await axios.get(`${API}/login-status`, { timeout: 5000 });
+      if (response.data?.data?.status === 'inactive') {
         setLoginDisabled(true);
       } else {
         setLoginDisabled(false);
