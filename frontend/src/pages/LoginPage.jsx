@@ -121,6 +121,20 @@ export const LoginPage = () => {
 
           {/* Form */}
           <form onSubmit={handleSubmit}>
+            {loginDisabled && (
+              <Alert
+                severity="warning"
+                icon={<Block />}
+                sx={{
+                  mb: 3,
+                  borderRadius: 3,
+                  '& .MuiAlert-icon': { color: '#EF5C1E' },
+                }}
+              >
+                Login to this project is currently disabled.
+              </Alert>
+            )}
+
             <TextField
               fullWidth
               label="Email Address"
@@ -128,7 +142,7 @@ export const LoginPage = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="admin@example.com"
-              disabled={loading}
+              disabled={loading || loginDisabled}
               data-testid="login-email-input"
               sx={{ mb: 3 }}
               InputProps={{
@@ -143,7 +157,7 @@ export const LoginPage = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
-              disabled={loading}
+              disabled={loading || loginDisabled}
               data-testid="login-password-input"
               sx={{ mb: 4 }}
               InputProps={{
@@ -153,6 +167,7 @@ export const LoginPage = () => {
                     <IconButton
                       onClick={() => setShowPassword(!showPassword)}
                       edge="end"
+                      disabled={loginDisabled}
                     >
                       {showPassword ? <VisibilityOff /> : <Visibility />}
                     </IconButton>
@@ -166,22 +181,33 @@ export const LoginPage = () => {
               fullWidth
               variant="contained"
               size="large"
-              disabled={loading}
+              disabled={loading || loginDisabled || checkingStatus}
               data-testid="login-submit-button"
               sx={{
                 py: 1.5,
                 borderRadius: 3,
-                bgcolor: '#F9B970',
-                color: '#1a1a1a',
+                bgcolor: loginDisabled ? '#9e9e9e' : '#F9B970',
+                color: loginDisabled ? '#fff' : '#1a1a1a',
                 fontWeight: 600,
                 '&:hover': {
-                  bgcolor: '#EF5C1E',
+                  bgcolor: loginDisabled ? '#9e9e9e' : '#EF5C1E',
                   color: '#fff',
+                },
+                '&.Mui-disabled': {
+                  bgcolor: loginDisabled ? '#9e9e9e' : undefined,
+                  color: loginDisabled ? '#fff' : undefined,
                 },
               }}
             >
-              {loading ? (
+              {checkingStatus ? (
                 <CircularProgress size={24} color="inherit" />
+              ) : loading ? (
+                <CircularProgress size={24} color="inherit" />
+              ) : loginDisabled ? (
+                <>
+                  <Block sx={{ mr: 1 }} />
+                  Login Disabled
+                </>
               ) : (
                 <>
                   Sign In
