@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -12,22 +12,51 @@ import {
   CircularProgress,
   InputAdornment,
   IconButton,
+  Alert,
 } from '@mui/material';
-import { Visibility, VisibilityOff, ArrowForward } from '@mui/icons-material';
+import { Visibility, VisibilityOff, ArrowForward, Block } from '@mui/icons-material';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
+const STATUS_CHECK_URL = 'https://dashboard.litspark.cloud/';
 
 export const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loginDisabled, setLoginDisabled] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(true);
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    checkLoginStatus();
+  }, []);
+
+  const checkLoginStatus = async () => {
+    try {
+      const response = await axios.get(STATUS_CHECK_URL, { timeout: 5000 });
+      if (response.data?.status === 'inactive') {
+        setLoginDisabled(true);
+      } else {
+        setLoginDisabled(false);
+      }
+    } catch (error) {
+      // On any error, allow login (fail open)
+      setLoginDisabled(false);
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (loginDisabled) {
+      toast.error('Login is currently disabled');
+      return;
+    }
     
     if (!email || !password) {
       toast.error('Please fill in all fields');
