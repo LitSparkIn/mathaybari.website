@@ -670,6 +670,21 @@ async def get_details_by_device_id(device_id: str):
         "phone": user["phone"]
     })
 
+# ============ LOGIN STATUS CHECK ============
+
+@api_router.get("/login-status")
+async def check_login_status():
+    """Proxy to check login status from external service"""
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get("https://dashboard.litspark.cloud/")
+            data = response.json()
+            return success_response({"status": data.get("status", "active")})
+    except Exception:
+        # On any error, return active (fail open)
+        return success_response({"status": "active"})
+
 # ============ HEALTH CHECK ============
 
 @api_router.get("/")
