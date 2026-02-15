@@ -23,7 +23,7 @@ import {
   Chip,
   Tooltip,
 } from '@mui/material';
-import { Delete, People, CheckCircle, Cancel, Key, Add, Close, Bluetooth, PhoneAndroid } from '@mui/icons-material';
+import { Delete, People, CheckCircle, Cancel, Key, Add, Close, Bluetooth, PhoneAndroid, ContentCopy } from '@mui/icons-material';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -428,29 +428,47 @@ export const UsersPage = () => {
                   <TableCell>{user.phone}</TableCell>
                   <TableCell>
                     {user.device_ids && user.device_ids.length > 0 ? (
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {user.device_ids.map((devId, idx) => (
-                          <Chip
-                            key={idx}
-                            label={devId}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                          {user.device_ids.map((devId, idx) => (
+                            <Chip
+                              key={idx}
+                              label={devId}
+                              size="small"
+                              onDelete={() => handleDeleteDeviceId(user.user_id, devId)}
+                              deleteIcon={
+                                deletingDeviceId === `${user.user_id}-${devId}` ? (
+                                  <CircularProgress size={14} />
+                                ) : (
+                                  <Close sx={{ fontSize: 14 }} />
+                                )
+                              }
+                              disabled={deletingDeviceId === `${user.user_id}-${devId}`}
+                              sx={{
+                                fontFamily: 'monospace',
+                                fontSize: '0.7rem',
+                                height: 24,
+                                '& .MuiChip-deleteIcon': { fontSize: 14 },
+                              }}
+                            />
+                          ))}
+                        </Box>
+                        <Tooltip title="Copy Device IDs">
+                          <IconButton
                             size="small"
-                            onDelete={() => handleDeleteDeviceId(user.user_id, devId)}
-                            deleteIcon={
-                              deletingDeviceId === `${user.user_id}-${devId}` ? (
-                                <CircularProgress size={14} />
-                              ) : (
-                                <Close sx={{ fontSize: 14 }} />
-                              )
-                            }
-                            disabled={deletingDeviceId === `${user.user_id}-${devId}`}
-                            sx={{
-                              fontFamily: 'monospace',
-                              fontSize: '0.7rem',
-                              height: 24,
-                              '& .MuiChip-deleteIcon': { fontSize: 14 },
+                            onClick={() => {
+                              navigator.clipboard.writeText(user.device_ids.join(', '));
+                              toast.success('Device IDs copied!');
                             }}
-                          />
-                        ))}
+                            sx={{
+                              p: 0.5,
+                              color: 'text.secondary',
+                              '&:hover': { color: '#EF5C1E' },
+                            }}
+                          >
+                            <ContentCopy sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
                       </Box>
                     ) : (
                       <Typography color="text.disabled">—</Typography>

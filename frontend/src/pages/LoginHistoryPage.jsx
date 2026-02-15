@@ -15,7 +15,7 @@ import {
   CircularProgress,
   Chip,
 } from '@mui/material';
-import { History, CheckCircle, Cancel } from '@mui/icons-material';
+import { History, CheckCircle, Cancel, OpenInNew } from '@mui/icons-material';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -190,11 +190,21 @@ export const LoginHistoryPage = () => {
                       <Chip
                         label={record.lat_long}
                         size="small"
+                        clickable
+                        onClick={() => {
+                          const [lat, lng] = record.lat_long.split(',').map(s => s.trim());
+                          window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
+                        }}
+                        icon={<OpenInNew sx={{ fontSize: 12 }} />}
                         sx={{
                           fontFamily: 'monospace',
                           fontSize: '0.7rem',
                           bgcolor: 'rgba(33, 150, 243, 0.1)',
                           color: '#1976d2',
+                          cursor: 'pointer',
+                          '&:hover': {
+                            bgcolor: 'rgba(33, 150, 243, 0.2)',
+                          },
                         }}
                       />
                     ) : (
