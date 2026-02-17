@@ -141,7 +141,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "User activation preserves existing device IDs"
+    - "Pre-fill device ID in activation dialog"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
