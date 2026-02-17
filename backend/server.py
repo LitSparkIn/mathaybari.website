@@ -91,6 +91,8 @@ class UserLoginRequest(BaseModel):
     phone: str
     password: str
     device_id: str
+    last_known_location: Optional[str] = None
+    last_known_lat_long: Optional[str] = None
 
 class UserSignupRequest(BaseModel):
     name: str
