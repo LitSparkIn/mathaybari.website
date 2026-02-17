@@ -513,6 +513,9 @@ async def add_device_id(user_id: int, device_id: str, email: str = Depends(verif
         {"$set": {"device_ids": device_ids}}
     )
     
+    # Upsert device in devices table (updates user info if device exists, creates if not)
+    await upsert_device(device_id, user["user_id"], user["phone"], user["name"])
+    
     return success_response({
         "message": "Device ID added successfully.",
         "user_id": user_id,
