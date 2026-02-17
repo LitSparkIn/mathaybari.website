@@ -13,6 +13,7 @@ import random
 import string
 from datetime import datetime, timezone, timedelta
 import jwt
+import httpx
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
