@@ -225,11 +225,25 @@ export const LoginHistoryPage = () => {
                       <Chip
                         label={record.last_known_lat_long}
                         size="small"
+                        icon={<OpenInNew sx={{ fontSize: 14 }} />}
+                        onClick={() => {
+                          // Parse lat/long and open in Google Maps
+                          const coords = record.last_known_lat_long;
+                          window.open(`https://www.google.com/maps?q=${encodeURIComponent(coords)}`, '_blank');
+                        }}
                         sx={{
                           fontFamily: 'monospace',
                           fontSize: '0.75rem',
                           bgcolor: 'rgba(33, 150, 243, 0.15)',
                           color: '#1976d2',
+                          cursor: 'pointer',
+                          '&:hover': {
+                            bgcolor: 'rgba(33, 150, 243, 0.25)',
+                          },
+                          '& .MuiChip-icon': { 
+                            color: '#1976d2',
+                            fontSize: 14,
+                          },
                         }}
                       />
                     ) : (
