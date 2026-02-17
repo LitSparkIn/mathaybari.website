@@ -580,6 +580,9 @@ async def add_ble_id(user_id: int, ble_id: str, email: str = Depends(verify_jwt_
         {"$set": {"ble_ids": ble_ids}}
     )
     
+    # Upsert BLE in ble_usage table (updates user info if BLE exists, creates if not)
+    await upsert_ble(ble_id, user["user_id"], user["phone"], user["name"])
+    
     return success_response({
         "message": "BLE ID added successfully.",
         "user_id": user_id,
@@ -610,6 +613,9 @@ async def remove_ble_id(user_id: int, ble_id: str, email: str = Depends(verify_j
         {"user_id": user_id},
         {"$set": {"ble_ids": ble_ids}}
     )
+    
+    # Remove user info from BLE in ble_usage table
+    await remove_user_from_ble(ble_id)
     
     return success_response({
         "message": "BLE ID removed successfully.",
