@@ -11,7 +11,7 @@ import {
   Button,
   Divider,
 } from '@mui/material';
-import { Dashboard, People, Logout, PhoneAndroid, History } from '@mui/icons-material';
+import { Dashboard, People, Logout, Bluetooth, History } from '@mui/icons-material';
 
 export const Sidebar = () => {
   const { logout, user } = useAuth();
@@ -25,7 +25,7 @@ export const Sidebar = () => {
   const navItems = [
     { to: '/dashboard', icon: <Dashboard />, label: 'Dashboard' },
     { to: '/users', icon: <People />, label: 'Users' },
-    { to: '/devices', icon: <PhoneAndroid />, label: 'Usage by Device' },
+    { to: '/ble-usage', icon: <Bluetooth />, label: 'Usage by BLE' },
     { to: '/login-history', icon: <History />, label: 'Login History' },
   ];
 
