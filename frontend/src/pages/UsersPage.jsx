@@ -635,7 +635,10 @@ export const UsersPage = () => {
         <DialogTitle sx={{ fontWeight: 600 }}>Activate User</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Enter the Device ID (phone identifier) to activate <strong>{selectedUser?.name}</strong>.
+            {selectedUser?.device_ids?.length > 0 
+              ? <>Re-activate <strong>{selectedUser?.name}</strong> with the existing Device ID (you can edit if needed).</>
+              : <>Enter the Device ID (phone identifier) to activate <strong>{selectedUser?.name}</strong>.</>
+            }
           </Typography>
           
           <TextField
@@ -647,6 +650,7 @@ export const UsersPage = () => {
             disabled={activating}
             required
             InputProps={{ sx: { borderRadius: 3 } }}
+            helperText={selectedUser?.device_ids?.length > 0 ? "Pre-filled from existing device ID" : ""}
           />
         </DialogContent>
         <DialogActions sx={{ p: 3, pt: 0 }}>
