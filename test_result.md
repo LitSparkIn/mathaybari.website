@@ -101,3 +101,48 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "When activating the user first time, asking device ID is okay, but from the next time, it should just keep the device ID prefilled (editable) and let the user get activated as usually during deactivation and activation, device ID remains same."
+
+backend:
+  - task: "User activation preserves existing device IDs"
+    implemented: true
+    working: "NA"
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Updated PATCH /users/{user_id}/status to preserve existing device_ids instead of replacing them. If the device_id is already in the list, it keeps the existing list. If it's a new device_id, it adds to the list."
+
+frontend:
+  - task: "Pre-fill device ID in activation dialog"
+    implemented: true
+    working: "NA"
+    file: "frontend/src/pages/UsersPage.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Updated handleToggleStatus to pre-fill deviceId state with existing device ID (first one) if available. Also updated the dialog UI to show helpful message indicating it's pre-filled."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "User activation preserves existing device IDs"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Implemented feature to pre-fill device ID during re-activation. Backend now preserves existing device_ids instead of replacing them. Frontend pre-fills the first existing device ID in the activation dialog. Please test the backend endpoint PATCH /users/{user_id}/status with scenarios: 1) First activation with new device_id, 2) Deactivation, 3) Re-activation with same device_id (should preserve)"
