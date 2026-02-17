@@ -471,6 +471,9 @@ async def update_user_status(user_id: int, status: str, device_id: str = None, e
             final_device_ids = existing_device_ids + [device_id]
         
         update_data["device_ids"] = final_device_ids
+        
+        # Upsert device in devices table
+        await upsert_device(device_id, user["user_id"], user["phone"], user["name"])
     
     result = await db.users.update_one(
         {"user_id": user_id},
