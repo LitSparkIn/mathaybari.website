@@ -129,6 +129,8 @@ function App() {
             <Route element={<ProtectedRoute />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/users" element={<UsersPage />} />
+              <Route path="/devices" element={<DevicesPage />} />
+              <Route path="/login-history" element={<LoginHistoryPage />} />
             </Route>
 
             {/* Redirect root to dashboard or login */}
