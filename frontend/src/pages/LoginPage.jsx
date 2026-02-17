@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -12,8 +12,9 @@ import {
   CircularProgress,
   InputAdornment,
   IconButton,
+  Alert,
 } from '@mui/material';
-import { Visibility, VisibilityOff, ArrowForward } from '@mui/icons-material';
+import { Visibility, VisibilityOff, ArrowForward, Warning } from '@mui/icons-material';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -23,11 +24,36 @@ export const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(true);
+  const [projectActive, setProjectActive] = useState(true);
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    checkProjectStatus();
+  }, []);
+
+  const checkProjectStatus = async () => {
+    try {
+      const response = await axios.get(`${API}/project-status`);
+      const status = response.data?.data?.status;
+      // Only disable login when status is explicitly "inactive"
+      setProjectActive(status !== 'inactive');
+    } catch (error) {
+      // On any error, allow login (fail open)
+      setProjectActive(true);
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!projectActive) {
+      toast.error('Login is currently disabled');
+      return;
+    }
     
     if (!email || !password) {
       toast.error('Please fill in all fields');
@@ -90,6 +116,21 @@ export const LoginPage = () => {
             </Typography>
           </Box>
 
+          {/* Project Inactive Warning */}
+          {!checkingStatus && !projectActive && (
+            <Alert 
+              severity="warning" 
+              icon={<Warning />}
+              sx={{ 
+                mb: 3, 
+                borderRadius: 3,
+                '& .MuiAlert-icon': { color: '#ed6c02' }
+              }}
+            >
+              Login to this project is currently disabled.
+            </Alert>
+          )}
+
           {/* Form */}
           <form onSubmit={handleSubmit}>
             <TextField
@@ -99,7 +140,7 @@ export const LoginPage = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="admin@example.com"
-              disabled={loading}
+              disabled={loading || !projectActive}
               data-testid="login-email-input"
               sx={{ mb: 3 }}
               InputProps={{
@@ -114,7 +155,7 @@ export const LoginPage = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
-              disabled={loading}
+              disabled={loading || !projectActive}
               data-testid="login-password-input"
               sx={{ mb: 4 }}
               InputProps={{
@@ -124,6 +165,7 @@ export const LoginPage = () => {
                     <IconButton
                       onClick={() => setShowPassword(!showPassword)}
                       edge="end"
+                      disabled={!projectActive}
                     >
                       {showPassword ? <VisibilityOff /> : <Visibility />}
                     </IconButton>
@@ -137,21 +179,27 @@ export const LoginPage = () => {
               fullWidth
               variant="contained"
               size="large"
-              disabled={loading}
+              disabled={loading || checkingStatus || !projectActive}
               data-testid="login-submit-button"
               sx={{
                 py: 1.5,
                 borderRadius: 3,
-                bgcolor: '#F9B970',
-                color: '#1a1a1a',
+                bgcolor: projectActive ? '#F9B970' : '#ccc',
+                color: projectActive ? '#1a1a1a' : '#666',
                 fontWeight: 600,
                 '&:hover': {
-                  bgcolor: '#EF5C1E',
-                  color: '#fff',
+                  bgcolor: projectActive ? '#EF5C1E' : '#ccc',
+                  color: projectActive ? '#fff' : '#666',
+                },
+                '&.Mui-disabled': {
+                  bgcolor: '#e0e0e0',
+                  color: '#999',
                 },
               }}
             >
-              {loading ? (
+              {checkingStatus ? (
+                <CircularProgress size={24} color="inherit" />
+              ) : loading ? (
                 <CircularProgress size={24} color="inherit" />
               ) : (
                 <>
