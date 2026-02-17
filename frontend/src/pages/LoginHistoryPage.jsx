@@ -15,7 +15,7 @@ import {
   CircularProgress,
   Chip,
 } from '@mui/material';
-import { History, Person, PhoneAndroid, LocationOn, AccessTime } from '@mui/icons-material';
+import { History, Person, Bluetooth, LocationOn, AccessTime } from '@mui/icons-material';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -144,7 +144,7 @@ export const LoginHistoryPage = () => {
                 <TableCell sx={{ fontWeight: 600 }}>User ID</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>User Name</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Phone</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Device ID</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>BLE IDs</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Location</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Lat/Long</TableCell>
               </TableRow>
@@ -188,12 +188,27 @@ export const LoginHistoryPage = () => {
                   </TableCell>
                   <TableCell sx={{ fontFamily: 'monospace' }}>{record.phone}</TableCell>
                   <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <PhoneAndroid sx={{ fontSize: 18, color: '#9c27b0' }} />
-                      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
-                        {record.device_id}
-                      </Typography>
-                    </Box>
+                    {record.ble_ids && record.ble_ids.length > 0 ? (
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {record.ble_ids.map((bleId, idx) => (
+                          <Chip
+                            key={idx}
+                            icon={<Bluetooth sx={{ fontSize: 14 }} />}
+                            label={bleId}
+                            size="small"
+                            sx={{
+                              fontFamily: 'monospace',
+                              fontSize: '0.75rem',
+                              bgcolor: 'rgba(0, 188, 212, 0.15)',
+                              color: '#00838f',
+                              '& .MuiChip-icon': { color: '#00bcd4' },
+                            }}
+                          />
+                        ))}
+                      </Box>
+                    ) : (
+                      <Typography color="text.disabled">—</Typography>
+                    )}
                   </TableCell>
                   <TableCell>
                     {record.last_known_location ? (
