@@ -100,7 +100,9 @@ export const UsersPage = () => {
       updateStatus(user.user_id, 'Inactive');
     } else {
       setSelectedUser(user);
-      setDeviceId('');
+      // Pre-fill with existing device ID if available (for re-activation)
+      const existingDeviceId = user.device_ids && user.device_ids.length > 0 ? user.device_ids[0] : '';
+      setDeviceId(existingDeviceId);
       setActivateDialogOpen(true);
     }
   };
