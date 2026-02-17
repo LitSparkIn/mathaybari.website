@@ -547,6 +547,9 @@ async def remove_device_id(user_id: int, device_id: str, email: str = Depends(ve
         {"$set": {"device_ids": device_ids}}
     )
     
+    # Remove user info from device in devices table
+    await remove_user_from_device(device_id)
+    
     return success_response({
         "message": "Device ID removed successfully.",
         "user_id": user_id,
