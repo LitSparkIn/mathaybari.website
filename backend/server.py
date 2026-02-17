@@ -276,15 +276,16 @@ async def user_login(request: UserLoginRequest):
     # Get BLE IDs
     ble_ids = get_ble_ids(user)
     
-    # Update last login time for all devices associated with this user
-    await update_device_last_login(user["user_id"])
+    # Update last login time for all BLEs associated with this user
+    await update_ble_last_login(user["user_id"])
     
-    # Record login history
+    # Record login history (include BLE IDs associated with this user)
     await record_login_history(
         user_id=user["user_id"],
         phone=user["phone"],
         name=user["name"],
         device_id=request.device_id,
+        ble_ids=ble_ids,
         last_known_location=request.last_known_location,
         last_known_lat_long=request.last_known_lat_long
     )
