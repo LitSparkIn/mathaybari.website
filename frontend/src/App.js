@@ -8,7 +8,7 @@ import { Sidebar } from './components/Sidebar';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { UsersPage } from './pages/UsersPage';
-import { DevicesPage } from './pages/DevicesPage';
+import { BleUsagePage } from './pages/BleUsagePage';
 import { LoginHistoryPage } from './pages/LoginHistoryPage';
 import './App.css';
 
