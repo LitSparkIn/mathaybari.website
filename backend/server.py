@@ -377,22 +377,38 @@ async def update_user_status(user_id: int, status: str, device_id: str = None, e
         if not device_id:
             return error_response("Device ID is required when activating a user", 400)
     
+    # Get current user to preserve existing device_ids
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user:
+        return error_response("User not found", 404)
+    
     update_data = {"status": status}
+    final_device_ids = None
+    
     if status == "Active":
-        update_data["device_ids"] = [device_id]
+        # Get existing device_ids
+        existing_device_ids = get_device_ids(user)
+        
+        # If device_id is already in the list, keep existing list
+        # Otherwise, add it to the list (for first-time activation or new device)
+        if device_id.lower() in [d.lower() for d in existing_device_ids]:
+            # Device ID already exists, keep existing list
+            final_device_ids = existing_device_ids
+        else:
+            # New device ID, add to list
+            final_device_ids = existing_device_ids + [device_id]
+        
+        update_data["device_ids"] = final_device_ids
     
     result = await db.users.update_one(
         {"user_id": user_id},
         {"$set": update_data}
     )
     
-    if result.matched_count == 0:
-        return error_response("User not found", 404)
-    
     return success_response({
         "message": f"User status updated to {status}",
         "user_id": user_id,
-        "device_ids": [device_id] if status == "Active" else None
+        "device_ids": final_device_ids
     })
 
 # ============ DEVICE ID ROUTES ============
