@@ -129,7 +129,7 @@ function App() {
             <Route element={<ProtectedRoute />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/users" element={<UsersPage />} />
-              <Route path="/devices" element={<DevicesPage />} />
+              <Route path="/ble-usage" element={<BleUsagePage />} />
               <Route path="/login-history" element={<LoginHistoryPage />} />
             </Route>
 
