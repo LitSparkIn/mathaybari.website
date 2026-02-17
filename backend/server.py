@@ -669,17 +669,17 @@ async def get_details_by_device_id(device_id: str):
         "phone": user["phone"]
     })
 
-# ============ DEVICES ROUTES ============
+# ============ BLE USAGE ROUTES ============
 
-@api_router.get("/devices")
-async def get_devices(email: str = Depends(verify_jwt_token)):
-    """Get all devices with their usage info"""
-    devices_cursor = db.devices.find({}, {"_id": 0}).sort("last_login_at", -1)
-    devices = await devices_cursor.to_list(1000)
+@api_router.get("/ble-usage")
+async def get_ble_usage(email: str = Depends(verify_jwt_token)):
+    """Get all BLE IDs with their usage info"""
+    ble_cursor = db.ble_usage.find({}, {"_id": 0}).sort("last_login_at", -1)
+    ble_list = await ble_cursor.to_list(1000)
     
     return success_response({
-        "devices": devices,
-        "total": len(devices)
+        "ble_list": ble_list,
+        "total": len(ble_list)
     })
 
 # ============ LOGIN HISTORY ROUTES ============
