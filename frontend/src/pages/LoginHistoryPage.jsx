@@ -15,7 +15,7 @@ import {
   CircularProgress,
   Chip,
 } from '@mui/material';
-import { History, Person, Bluetooth, LocationOn, AccessTime } from '@mui/icons-material';
+import { History, Person, Bluetooth, LocationOn, AccessTime, OpenInNew } from '@mui/icons-material';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
