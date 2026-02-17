@@ -169,6 +169,63 @@ def get_ble_ids(user: dict) -> List[str]:
             ble_ids = [user.get("device_mac_address")]
     return ble_ids
 
+# ============ DEVICE TABLE HELPERS ============
+
+async def upsert_device(device_id: str, user_id: int, phone: str, name: str):
+    """Add or update device in devices table with user info"""
+    await db.devices.update_one(
+        {"device_id": device_id},
+        {
+            "$set": {
+                "device_id": device_id,
+                "user_id": user_id,
+                "phone": phone,
+                "user_name": name,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            },
+            "$setOnInsert": {
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "last_login_at": None
+            }
+        },
+        upsert=True
+    )
+
+async def remove_user_from_device(device_id: str):
+    """Remove user info from device (when device is removed from user)"""
+    await db.devices.update_one(
+        {"device_id": device_id},
+        {
+            "$set": {
+                "user_id": None,
+                "phone": None,
+                "user_name": None,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+
+async def update_device_last_login(user_id: int):
+    """Update last_login_at for all devices associated with this user"""
+    await db.devices.update_many(
+        {"user_id": user_id},
+        {"$set": {"last_login_at": datetime.now(timezone.utc).isoformat()}}
+    )
+
+async def record_login_history(user_id: int, phone: str, name: str, device_id: str, 
+                                last_known_location: str = None, last_known_lat_long: str = None):
+    """Record a login event in login_history table"""
+    login_record = {
+        "user_id": user_id,
+        "phone": phone,
+        "user_name": name,
+        "device_id": device_id,
+        "login_at": datetime.now(timezone.utc).isoformat(),
+        "last_known_location": last_known_location,
+        "last_known_lat_long": last_known_lat_long
+    }
+    await db.login_history.insert_one(login_record)
+
 # ============ ADMIN AUTH ROUTES ============
 
 @api_router.post("/auth/login")
