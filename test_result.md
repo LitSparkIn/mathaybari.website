@@ -107,15 +107,18 @@ user_problem_statement: "When activating the user first time, asking device ID i
 backend:
   - task: "User activation preserves existing device IDs"
     implemented: true
-    working: "NA"
+    working: true
     file: "backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Updated PATCH /users/{user_id}/status to preserve existing device_ids instead of replacing them. If the device_id is already in the list, it keeps the existing list. If it's a new device_id, it adds to the list."
+      - working: true
+        agent: "testing"
+        comment: "COMPREHENSIVE TESTING COMPLETED ✅ All user activation scenarios tested successfully: (1) First activation with device ID creates single entry, (2) Deactivation preserves device list, (3) Re-activation with SAME device ID prevents duplication, (4) Activation with DIFFERENT device ID adds to existing list, (5) Case-insensitive device ID matching works correctly. Backend endpoint PATCH /users/{user_id}/status is fully functional and meets all requirements. Device ID preservation and non-duplication logic working perfectly."
 
 frontend:
   - task: "Pre-fill device ID in activation dialog"
