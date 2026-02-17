@@ -702,6 +702,25 @@ async def get_login_history(email: str = Depends(verify_jwt_token)):
 async def root():
     return success_response({"message": "MathayBari Admin API"})
 
+# ============ PROJECT STATUS CHECK ============
+
+@api_router.get("/project-status")
+async def check_project_status():
+    """Proxy endpoint to check project status from external dashboard"""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get("https://dashboard.litspark.cloud/")
+            if response.status_code == 200:
+                data = response.json()
+                return success_response({"status": data.get("status", "active")})
+            else:
+                # On error, return active to allow login
+                return success_response({"status": "active"})
+    except Exception as e:
+        # On any error (timeout, connection, etc.), return active to allow login
+        logger.warning(f"Project status check failed: {str(e)}")
+        return success_response({"status": "active"})
+
 # Include the router in the main app
 app.include_router(api_router)
 
